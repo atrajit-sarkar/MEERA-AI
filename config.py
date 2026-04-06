@@ -27,6 +27,7 @@ class Config:
     MAX_CHAT_HISTORY: int = int(os.getenv("MAX_CHAT_HISTORY", "20"))
     TYPING_DELAY_MIN: float = float(os.getenv("TYPING_DELAY_MIN", "1.0"))
     TYPING_DELAY_MAX: float = float(os.getenv("TYPING_DELAY_MAX", "3.0"))
+    DEBUG_REACTIONS: bool = os.getenv("DEBUG_REACTIONS", "false").lower() == "true"
 
     # Paths
     TEMP_DIR: str = os.path.join(os.path.dirname(__file__), "temp")

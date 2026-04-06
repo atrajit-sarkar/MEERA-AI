@@ -10,7 +10,7 @@ from aiogram import Bot, Router, F
 from aiogram.types import Message, FSInputFile, ReactionTypeEmoji
 
 from config import Config
-from services.ollama_service import get_ai_response, should_reply_with_voice
+from services.ollama_service import get_ai_response, should_reply_with_voice, pick_reaction_emoji
 from services.elevenlabs_service import text_to_speech, cleanup_audio_file
 from services.stt_service import transcribe_voice
 from services.firebase_service import (
@@ -25,42 +25,30 @@ from services.key_manager import user_has_ollama_keys, user_has_elevenlabs_keys
 logger = logging.getLogger(__name__)
 router = Router()
 
-# Reaction emojis mapped to message vibes
-_REACTIONS_POSITIVE = ["❤", "😂", "🔥", "👍", "😍", "🎉", "💯"]
-_REACTIONS_THINKING = ["🤔", "👀", "🫡"]
-_REACTIONS_EMPATHY = ["❤", "😢", "🥺"]
-_REACTIONS_FUN = ["😂", "🤣", "💀", "😭"]
-_REACTIONS_VOICE = ["🎤", "🔥", "❤", "😍"]
 
+async def _react_to_message(
+    bot: Bot, message: Message, user_id: int,
+    user_text: str, chat_history: list[dict], chat_history_len: int = 0,
+) -> None:
+    """Pick a contextual reaction emoji using AI — frequency based on comfort level."""
+    if not Config.DEBUG_REACTIONS:
+        # Comfort-based reaction probability
+        if chat_history_len < 5:
+            react_chance = 0.10
+        elif chat_history_len < 15:
+            react_chance = 0.25
+        elif chat_history_len < 30:
+            react_chance = 0.50
+        else:
+            react_chance = 0.70
 
-async def _react_to_message(bot: Bot, message: Message, vibe: str = "positive", chat_history_len: int = 0) -> None:
-    """Add an emoji reaction — frequency increases as Meera gets comfortable."""
-    # Comfort-based reaction probability
-    if chat_history_len < 5:
-        # New user — rarely react (~10%), still shy
-        react_chance = 0.10
-    elif chat_history_len < 15:
-        # Getting comfortable — react sometimes (~25%)
-        react_chance = 0.25
-    elif chat_history_len < 30:
-        # Friends now — react often (~50%)
-        react_chance = 0.50
-    else:
-        # Close — react frequently (~70%), like a real bestie
-        react_chance = 0.70
+        if random.random() > react_chance:
+            return
 
-    if random.random() > react_chance:
+    # Ask AI to pick a contextual reaction emoji
+    emoji = await pick_reaction_emoji(user_id, user_text, chat_history)
+    if not emoji:
         return
-
-    reaction_map = {
-        "positive": _REACTIONS_POSITIVE,
-        "thinking": _REACTIONS_THINKING,
-        "empathy": _REACTIONS_EMPATHY,
-        "fun": _REACTIONS_FUN,
-        "voice": _REACTIONS_VOICE,
-    }
-    emojis = reaction_map.get(vibe, _REACTIONS_POSITIVE)
-    emoji = random.choice(emojis)
 
     try:
         await bot.set_message_reaction(
@@ -69,24 +57,7 @@ async def _react_to_message(bot: Bot, message: Message, vibe: str = "positive", 
             reaction=[ReactionTypeEmoji(emoji=emoji)],
         )
     except Exception as e:
-        # Reactions might not be supported in all chats — silently ignore
         logger.debug(f"Could not set reaction: {e}")
-
-
-def _guess_vibe(text: str) -> str:
-    """Guess the emotional vibe of a message for reaction selection."""
-    text_lower = text.lower()
-    sad_words = ["sad", "upset", "hurt", "crying", "miss", "lonely", "depressed", "sorry", "😢", "😭", "💔"]
-    fun_words = ["lol", "lmao", "haha", "rofl", "😂", "🤣", "funny", "joke", "💀"]
-    question_words = ["what", "how", "why", "when", "where", "?", "explain", "tell me"]
-
-    if any(w in text_lower for w in sad_words):
-        return "empathy"
-    if any(w in text_lower for w in fun_words):
-        return "fun"
-    if any(w in text_lower for w in question_words):
-        return "thinking"
-    return "positive"
 
 
 async def _simulate_typing(bot: Bot, chat_id: int, text_length: int = 50) -> None:
@@ -181,8 +152,7 @@ async def handle_text_message(message: Message, bot: Bot) -> None:
         user_profile = await get_user_profile(user_id)
 
         # React based on comfort level (how many messages exchanged)
-        vibe = _guess_vibe(user_text)
-        await _react_to_message(bot, message, vibe, len(chat_history))
+        await _react_to_message(bot, message, user_id, user_text, chat_history, len(chat_history))
 
         # Decide voice or text BEFORE generating response (so we show the right indicator)
         user_data = await get_user(user_id)
@@ -263,7 +233,7 @@ async def handle_voice_message(message: Message, bot: Bot) -> None:
         user_profile = await get_user_profile(user_id)
 
         # React to voice based on comfort level
-        await _react_to_message(bot, message, "voice", len(chat_history))
+        await _react_to_message(bot, message, user_id, transcript, chat_history, len(chat_history))
 
         # Send to AI (just the transcript, no robotic prefix)
         ai_response = await get_ai_response(

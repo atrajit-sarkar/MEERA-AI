@@ -187,3 +187,60 @@ async def _call_ollama(api_key: str, messages: list[dict]) -> str:
     )
 
     return response["message"]["content"]
+
+
+# All Telegram-supported reaction emojis
+_TELEGRAM_REACTION_EMOJIS = [
+    "👍", "👎", "❤", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱",
+    "🤬", "😢", "🎉", "🤩", "🤮", "💩", "🙏", "👌", "🕊", "🤡",
+    "🥱", "🥴", "😍", "🐳", "❤‍🔥", "🌚", "🌭", "💯", "🤣", "⚡",
+    "🍌", "🏆", "💔", "🤨", "😐", "🍓", "🍾", "💋", "🖕", "😈",
+    "😴", "😭", "🤓", "👻", "👨‍💻", "👀", "🎃", "🙈", "😇", "😨",
+    "🤝", "✍", "🤗", "🫡", "🎅", "🎄", "☃", "💅", "🤪", "🗿",
+    "🆒", "💘", "🙉", "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂",
+    "🤷", "🤷‍♀", "😡",
+]
+
+_REACTION_PICK_PROMPT = (
+    "You pick reaction emojis for Telegram messages. "
+    "Given a message and conversation context, reply with EXACTLY ONE emoji from this list — nothing else:\n"
+    + " ".join(_TELEGRAM_REACTION_EMOJIS)
+    + "\n\nPick the emoji that fits the vibe of the message best. Just the emoji, no text."
+)
+
+
+async def pick_reaction_emoji(
+    user_id: int, user_message: str, chat_history: list[dict]
+) -> str | None:
+    """Ask the AI to pick a contextual Telegram reaction emoji."""
+    keys_data = await get_user_api_keys(user_id)
+    ollama_keys = keys_data.get("ollama_keys", [])
+    if not ollama_keys:
+        return None
+
+    # Build a lightweight context: system + last few messages + current
+    messages = [{"role": "system", "content": _REACTION_PICK_PROMPT}]
+    for msg in chat_history[-4:]:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": user_message})
+
+    for encrypted_key in ollama_keys:
+        try:
+            decrypted_key = decrypt_key(encrypted_key)
+            raw = await _call_ollama(decrypted_key, messages)
+            emoji = raw.strip()
+            # Validate it's in the allowed list
+            if emoji in _TELEGRAM_REACTION_EMOJIS:
+                return emoji
+            # Model might have returned extra text — try to find an emoji in it
+            for e in _TELEGRAM_REACTION_EMOJIS:
+                if e in raw:
+                    return e
+            return None
+        except Exception as e:
+            logger.debug(f"Reaction pick failed for user {user_id}: {e}")
+            continue
+    return None
