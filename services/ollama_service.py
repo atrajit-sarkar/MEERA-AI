@@ -41,20 +41,6 @@ CRITICAL RULES:
 Keep it SHORT. This is chat, not email."""
 
 
-VOICE_DECISION_PROMPT = """Based on the conversation context below, decide if Meera should reply with a VOICE message or TEXT message. 
-Consider: 
-- If the user sent a voice message → almost always reply with voice
-- If the topic is emotional/personal/fun → lean towards voice  
-- If it's a quick factual question → text is fine
-- Randomly choose voice ~30% of the time for casual messages to feel human
-
-Reply with ONLY one word: VOICE or TEXT
-
-User message type: {message_type}
-User message: {user_message}
-Recent conversation mood: {mood}"""
-
-
 async def get_ai_response(
     user_id: int,
     user_message: str,
@@ -112,47 +98,41 @@ async def should_reply_with_voice(
     message_type: str,  # "voice" or "text"
     chat_history: list[dict],
 ) -> bool:
-    """Let the AI decide if Meera should reply with voice (human-like behavior)."""
+    """Decide if Meera should reply with voice — like a real girl.
+    
+    Girls rarely send voice messages to someone new. As they get comfortable
+    (more messages exchanged), voice becomes more natural.
+    """
+    msg_count = len(chat_history)
+
     if message_type == "voice":
-        # Almost always reply with voice if user sent voice
-        return random.random() < 0.9
+        # User sent voice — respond based on comfort level
+        if msg_count < 5:
+            # Just met — text reply mostly, voice is awkward
+            return random.random() < 0.15
+        elif msg_count < 15:
+            # Getting to know — sometimes reply with voice
+            return random.random() < 0.35
+        elif msg_count < 30:
+            # Comfortable — voice replies feel natural
+            return random.random() < 0.55
+        else:
+            # Close — voice is natural and frequent
+            return random.random() < 0.70
 
-    # For text messages, ask the model or use randomness
-    if random.random() < 0.15:
-        # ~15% random voice for casual text to feel human
-        return True
-
-    # Use the model to decide for contextual cases
-    try:
-        keys_data = await get_user_api_keys(user_id)
-        ollama_keys = keys_data.get("ollama_keys", [])
-        if not ollama_keys:
-            return False
-
-        mood = "neutral"
-        if chat_history:
-            recent = chat_history[-3:]
-            mood_texts = [m.get("content", "") for m in recent]
-            mood = " | ".join(mood_texts)[:200]
-
-        prompt = VOICE_DECISION_PROMPT.format(
-            message_type=message_type,
-            user_message=user_message[:200],
-            mood=mood,
-        )
-
-        decrypted_key = decrypt_key(ollama_keys[0])
-        client = AsyncClient(host=Config.OLLAMA_HOST, headers={"Authorization": f"Bearer {decrypted_key}"})
-
-        response = await client.chat(
-            model=Config.OLLAMA_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        decision = response["message"]["content"].strip().upper()
-        return "VOICE" in decision
-    except Exception as e:
-        logger.debug(f"Voice decision fallback to text: {e}")
+    # User sent text — voice reply is rare by default
+    if msg_count < 10:
+        # New — never send unsolicited voice
         return False
+    elif msg_count < 25:
+        # Warming up — very rare voice (~3%)
+        return random.random() < 0.03
+    elif msg_count < 50:
+        # Comfortable — occasional voice (~7%)
+        return random.random() < 0.07
+    else:
+        # Very close — sometimes voice (~12%)
+        return random.random() < 0.12
 
 
 def _build_messages(

@@ -7,7 +7,7 @@ import random
 import uuid
 
 from aiogram import Bot, Router, F
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message, FSInputFile, ReactionTypeEmoji
 
 from config import Config
 from services.ollama_service import get_ai_response, should_reply_with_voice
@@ -24,6 +24,69 @@ from services.key_manager import user_has_ollama_keys, user_has_elevenlabs_keys
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+# Reaction emojis mapped to message vibes
+_REACTIONS_POSITIVE = ["❤", "😂", "🔥", "👍", "😍", "🎉", "💯"]
+_REACTIONS_THINKING = ["🤔", "👀", "🫡"]
+_REACTIONS_EMPATHY = ["❤", "😢", "🥺"]
+_REACTIONS_FUN = ["😂", "🤣", "💀", "😭"]
+_REACTIONS_VOICE = ["🎤", "🔥", "❤", "😍"]
+
+
+async def _react_to_message(bot: Bot, message: Message, vibe: str = "positive", chat_history_len: int = 0) -> None:
+    """Add an emoji reaction — frequency increases as Meera gets comfortable."""
+    # Comfort-based reaction probability
+    if chat_history_len < 5:
+        # New user — rarely react (~10%), still shy
+        react_chance = 0.10
+    elif chat_history_len < 15:
+        # Getting comfortable — react sometimes (~25%)
+        react_chance = 0.25
+    elif chat_history_len < 30:
+        # Friends now — react often (~50%)
+        react_chance = 0.50
+    else:
+        # Close — react frequently (~70%), like a real bestie
+        react_chance = 0.70
+
+    if random.random() > react_chance:
+        return
+
+    reaction_map = {
+        "positive": _REACTIONS_POSITIVE,
+        "thinking": _REACTIONS_THINKING,
+        "empathy": _REACTIONS_EMPATHY,
+        "fun": _REACTIONS_FUN,
+        "voice": _REACTIONS_VOICE,
+    }
+    emojis = reaction_map.get(vibe, _REACTIONS_POSITIVE)
+    emoji = random.choice(emojis)
+
+    try:
+        await bot.set_message_reaction(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            reaction=[ReactionTypeEmoji(emoji=emoji)],
+        )
+    except Exception as e:
+        # Reactions might not be supported in all chats — silently ignore
+        logger.debug(f"Could not set reaction: {e}")
+
+
+def _guess_vibe(text: str) -> str:
+    """Guess the emotional vibe of a message for reaction selection."""
+    text_lower = text.lower()
+    sad_words = ["sad", "upset", "hurt", "crying", "miss", "lonely", "depressed", "sorry", "😢", "😭", "💔"]
+    fun_words = ["lol", "lmao", "haha", "rofl", "😂", "🤣", "funny", "joke", "💀"]
+    question_words = ["what", "how", "why", "when", "where", "?", "explain", "tell me"]
+
+    if any(w in text_lower for w in sad_words):
+        return "empathy"
+    if any(w in text_lower for w in fun_words):
+        return "fun"
+    if any(w in text_lower for w in question_words):
+        return "thinking"
+    return "positive"
 
 
 async def _simulate_typing(bot: Bot, chat_id: int, text_length: int = 50) -> None:
@@ -77,7 +140,11 @@ async def _send_voice_reply(bot: Bot, message: Message, user_id: int, ai_text: s
         audio_path = await text_to_speech(user_id, clean_text)
         if audio_path and os.path.exists(audio_path):
             voice_file = FSInputFile(audio_path)
-            await message.answer_voice(voice_file, caption=None)
+            # Reply to the original message ~50% of the time (human-like)
+            if random.random() < 0.5:
+                await message.reply_voice(voice_file)
+            else:
+                await message.answer_voice(voice_file)
             cleanup_audio_file(audio_path)
             return True
     except Exception as e:
@@ -86,6 +153,14 @@ async def _send_voice_reply(bot: Bot, message: Message, user_id: int, ai_text: s
 
 
 # ─── Text Message Handler ─────────────────────────────────────────
+
+async def _send_text_reply(message: Message, text: str) -> None:
+    """Send text — reply to the original message ~40% of the time for natural feel."""
+    if random.random() < 0.4:
+        await message.reply(text)
+    else:
+        await message.answer(text)
+
 
 @router.message(F.text)
 async def handle_text_message(message: Message, bot: Bot) -> None:
@@ -104,6 +179,10 @@ async def handle_text_message(message: Message, bot: Bot) -> None:
         # Get context
         chat_history = await get_chat_history(user_id)
         user_profile = await get_user_profile(user_id)
+
+        # React based on comfort level (how many messages exchanged)
+        vibe = _guess_vibe(user_text)
+        await _react_to_message(bot, message, vibe, len(chat_history))
 
         # Decide voice or text BEFORE generating response (so we show the right indicator)
         user_data = await get_user(user_id)
@@ -127,11 +206,11 @@ async def handle_text_message(message: Message, bot: Bot) -> None:
             if not sent:
                 # Fallback to text if voice fails
                 await _simulate_typing(bot, message.chat.id, len(ai_response))
-                await message.answer(ai_response)
+                await _send_text_reply(message, ai_response)
         else:
             # Text reply with typing indicator
             await _simulate_typing(bot, message.chat.id, len(ai_response))
-            await message.answer(ai_response)
+            await _send_text_reply(message, ai_response)
 
     except ValueError as e:
         error_category = str(e)
@@ -162,7 +241,7 @@ async def handle_voice_message(message: Message, bot: Bot) -> None:
 
     ogg_path = None
     try:
-        # Show record_voice while processing (user sent voice, we'll likely reply with voice)
+        # Show record_voice while processing
         await bot.send_chat_action(message.chat.id, "record_voice")
 
         # Download voice file
@@ -182,6 +261,9 @@ async def handle_voice_message(message: Message, bot: Bot) -> None:
         # Get context
         chat_history = await get_chat_history(user_id)
         user_profile = await get_user_profile(user_id)
+
+        # React to voice based on comfort level
+        await _react_to_message(bot, message, "voice", len(chat_history))
 
         # Send to AI (just the transcript, no robotic prefix)
         ai_response = await get_ai_response(
@@ -208,11 +290,11 @@ async def handle_voice_message(message: Message, bot: Bot) -> None:
                 # Voice failed — fallback to text with typing indicator
                 await _simulate_typing(bot, message.chat.id, len(ai_response))
                 tts_error = await get_friendly_error("tts_error")
-                await message.answer(f"{tts_error}\n\n{ai_response}")
+                await _send_text_reply(message, f"{tts_error}\n\n{ai_response}")
         else:
             # Text reply — show typing indicator
             await _simulate_typing(bot, message.chat.id, len(ai_response))
-            await message.answer(ai_response)
+            await _send_text_reply(message, ai_response)
 
     except ValueError as e:
         error_category = str(e)
