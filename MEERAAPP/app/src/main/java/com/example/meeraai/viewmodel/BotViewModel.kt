@@ -97,6 +97,12 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        // If already logged in, fetch config from Firestore on app start
+        viewModelScope.launch {
+            if (settingsStore.getBotConfig().telegramBotToken.isNotBlank()) {
+                fetchConfigFromFirestore()
+            }
+        }
     }
 
     fun saveBotToken(token: String) {
@@ -193,11 +199,36 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
                 // Save token
                 settingsStore.saveBotToken(token)
 
-                // Generate encryption key one-time (only if not already set)
-                val existingKey = settingsStore.getBotConfig().encryptionKey
-                if (existingKey.isBlank()) {
-                    val newKey = EncryptionService.generateEncryptionKey()
-                    settingsStore.saveEncryptionKey(newKey)
+                // Try to fetch existing config from Firestore first
+                var keyFromFirestore: String? = null
+                try {
+                    val firebase = FirebaseService(getApplication())
+                    firebase.init(dbId = "pussy")
+                    val appConfig = firebase.getBotAppConfig()
+                    keyFromFirestore = appConfig["encryption_key"] as? String
+                    val fbName = appConfig["bot_name"] as? String
+                    val fbPrompt = appConfig["custom_system_prompt"] as? String
+                    if (!fbName.isNullOrBlank()) settingsStore.saveBotName(fbName)
+                    if (!fbPrompt.isNullOrBlank()) settingsStore.saveCustomSystemPrompt(fbPrompt)
+                } catch (_: Exception) { /* Firestore unavailable, continue */ }
+
+                // Use encryption key from Firestore, or generate new one only if Firestore had none
+                if (!keyFromFirestore.isNullOrBlank()) {
+                    settingsStore.saveEncryptionKey(keyFromFirestore)
+                } else {
+                    val existingKey = settingsStore.getBotConfig().encryptionKey
+                    if (existingKey.isBlank()) {
+                        val newKey = EncryptionService.generateEncryptionKey()
+                        settingsStore.saveEncryptionKey(newKey)
+                        // Upload newly generated key to Firestore
+                        try {
+                            val firebase = FirebaseService(getApplication())
+                            firebase.init(dbId = "pussy")
+                            firebase.saveBotAppConfig(
+                                mapOf("encryption_key" to newKey)
+                            )
+                        } catch (_: Exception) { /* best-effort */ }
+                    }
                 }
 
                 // Mark logged in
@@ -274,9 +305,26 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
                     mapOf(
                         "bot_name" to config.botName,
                         "custom_system_prompt" to config.customSystemPrompt,
+                        "encryption_key" to config.encryptionKey,
                     )
                 )
             } catch (_: Exception) { /* best-effort sync */ }
+        }
+    }
+
+    private suspend fun fetchConfigFromFirestore() {
+        withContext(Dispatchers.IO) {
+            try {
+                val firebase = FirebaseService(getApplication())
+                firebase.init(dbId = "pussy")
+                val appConfig = firebase.getBotAppConfig()
+                val fbName = appConfig["bot_name"] as? String
+                val fbPrompt = appConfig["custom_system_prompt"] as? String
+                val fbKey = appConfig["encryption_key"] as? String
+                if (!fbName.isNullOrBlank()) settingsStore.saveBotName(fbName)
+                if (!fbPrompt.isNullOrBlank()) settingsStore.saveCustomSystemPrompt(fbPrompt)
+                if (!fbKey.isNullOrBlank()) settingsStore.saveEncryptionKey(fbKey)
+            } catch (_: Exception) { /* Firestore unavailable */ }
         }
     }
 }
