@@ -3,6 +3,7 @@ package com.example.meeraai.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -23,8 +24,10 @@ class SettingsStore(private val context: Context) {
         private val OLLAMA_HOST_KEY = stringPreferencesKey("ollama_host")
         private val OLLAMA_MODEL_KEY = stringPreferencesKey("ollama_model")
         private val ELEVENLABS_VOICE_KEY = stringPreferencesKey("elevenlabs_voice_id")
+        private val IS_LOGGED_IN_KEY = booleanPreferencesKey("is_logged_in")
     }
 
+    val isLoggedIn: Flow<Boolean> = context.dataStore.data.map { it[IS_LOGGED_IN_KEY] ?: false }
     val botToken: Flow<String> = context.dataStore.data.map { it[BOT_TOKEN_KEY] ?: "" }
     val firebaseCreds: Flow<String> = context.dataStore.data.map { it[FIREBASE_CREDS_KEY] ?: "" }
     val firebaseDbId: Flow<String> = context.dataStore.data.map { it[FIREBASE_DB_ID_KEY] ?: "(default)" }
@@ -64,6 +67,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun saveElevenlabsVoiceId(voiceId: String) {
         context.dataStore.edit { it[ELEVENLABS_VOICE_KEY] = voiceId }
+    }
+
+    suspend fun setLoggedIn(loggedIn: Boolean) {
+        context.dataStore.edit { it[IS_LOGGED_IN_KEY] = loggedIn }
     }
 
     suspend fun getBotConfig(): BotConfig {

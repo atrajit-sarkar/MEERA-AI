@@ -17,6 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.meeraai.ui.screens.HomeScreen
+import com.example.meeraai.ui.screens.LoginScreen
 import com.example.meeraai.ui.screens.LogsScreen
 import com.example.meeraai.ui.screens.SettingsScreen
 import com.example.meeraai.ui.theme.MeeraAITheme
@@ -40,6 +41,9 @@ fun MeeraApp(viewModel: BotViewModel = viewModel()) {
 
     val botToken by viewModel.botToken.collectAsState()
     val encryptionKey by viewModel.encryptionKey.collectAsState()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val isVerifying by viewModel.isVerifying.collectAsState()
+    val loginError by viewModel.loginError.collectAsState()
     val botName by viewModel.botName.collectAsState()
     val ollamaHost by viewModel.ollamaHost.collectAsState()
     val ollamaModel by viewModel.ollamaModel.collectAsState()
@@ -62,18 +66,36 @@ fun MeeraApp(viewModel: BotViewModel = viewModel()) {
         }
     }
 
-    NavHost(navController = navController, startDestination = "home") {
+    // Navigate on login/logout
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn && navController.currentDestination?.route == "login") {
+            navController.navigate("home") {
+                popUpTo("login") { inclusive = true }
+            }
+        } else if (!isLoggedIn && navController.currentDestination?.route != "login") {
+            navController.navigate("login") {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+
+    val startDestination = if (isLoggedIn) "home" else "login"
+
+    NavHost(navController = navController, startDestination = startDestination) {
+        composable("login") {
+            LoginScreen(
+                isVerifying = isVerifying,
+                errorMessage = loginError,
+                onConnect = { viewModel.verifyAndLogin(it) },
+            )
+        }
         composable("home") {
             HomeScreen(
-                botToken = botToken,
-                encryptionKey = encryptionKey,
                 botStatus = botStatus,
                 isConfigValid = isConfigValid,
-                onBotTokenChange = { viewModel.saveBotToken(it) },
-                onEncryptionKeyChange = { viewModel.saveEncryptionKey(it) },
-                onGenerateEncryptionKey = { viewModel.generateEncryptionKey() },
                 onStartBot = { viewModel.startBot() },
                 onStopBot = { viewModel.stopBot() },
+                onLogout = { viewModel.logout() },
                 onNavigateToSettings = { navController.navigate("settings") },
                 onNavigateToLogs = { navController.navigate("logs") },
             )

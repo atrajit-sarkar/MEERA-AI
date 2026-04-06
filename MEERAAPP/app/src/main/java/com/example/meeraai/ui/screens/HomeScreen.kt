@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -23,10 +22,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.meeraai.data.BotStatus
@@ -35,21 +30,15 @@ import com.example.meeraai.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    botToken: String,
-    encryptionKey: String,
     botStatus: BotStatus,
     isConfigValid: Boolean,
-    onBotTokenChange: (String) -> Unit,
-    onEncryptionKeyChange: (String) -> Unit,
-    onGenerateEncryptionKey: () -> Unit,
     onStartBot: () -> Unit,
     onStopBot: () -> Unit,
+    onLogout: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToLogs: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
-    var showToken by remember { mutableStateOf(false) }
-    var showEncKey by remember { mutableStateOf(false) }
 
     // Animated gradient for the header
     val infiniteTransition = rememberInfiniteTransition(label = "gradient")
@@ -124,69 +113,8 @@ fun HomeScreen(
 
         Spacer(Modifier.height(20.dp))
 
-        // ── Bot Token Input ──
+        // ── Start/Stop Button ──
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-            SectionLabel("🔑 Bot Token")
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = botToken,
-                onValueChange = onBotTokenChange,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Paste your Telegram Bot Token", color = MeeraGray) },
-                visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
-                    IconButton(onClick = { showToken = !showToken }) {
-                        Icon(
-                            if (showToken) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = "Toggle visibility",
-                            tint = MeeraGrayLight,
-                        )
-                    }
-                },
-                colors = meeraTextFieldColors(),
-                shape = RoundedCornerShape(16.dp),
-                singleLine = true,
-            )
-
-            Spacer(Modifier.height(20.dp))
-
-            // ── Encryption Key ──
-            SectionLabel("🔐 Encryption Key")
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = encryptionKey,
-                onValueChange = onEncryptionKeyChange,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Encryption key for API key storage", color = MeeraGray) },
-                visualTransformation = if (showEncKey) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
-                    Row {
-                        IconButton(onClick = { showEncKey = !showEncKey }) {
-                            Icon(
-                                if (showEncKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = "Toggle visibility",
-                                tint = MeeraGrayLight,
-                            )
-                        }
-                        IconButton(onClick = onGenerateEncryptionKey) {
-                            Icon(
-                                Icons.Filled.Autorenew,
-                                contentDescription = "Generate key",
-                                tint = MeeraPurpleLight,
-                            )
-                        }
-                    }
-                },
-                colors = meeraTextFieldColors(),
-                shape = RoundedCornerShape(16.dp),
-                singleLine = true,
-            )
-
-            Spacer(Modifier.height(32.dp))
-
-            // ── Start/Stop Button ──
             val isRunning = botStatus is BotStatus.Running
             val isStarting = botStatus is BotStatus.Starting
 
@@ -276,6 +204,25 @@ fun HomeScreen(
                 )
             }
 
+            Spacer(Modifier.height(12.dp))
+
+            // ── Logout ──
+            OutlinedButton(
+                onClick = onLogout,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MeeraRed,
+                ),
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
+                    brush = Brush.linearGradient(listOf(MeeraRed.copy(alpha = 0.5f), MeeraRed.copy(alpha = 0.5f)))
+                ),
+            ) {
+                Icon(Icons.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Disconnect Bot", fontWeight = FontWeight.Medium)
+            }
+
             Spacer(Modifier.height(20.dp))
 
             // ── Info Card ──
@@ -287,14 +234,12 @@ fun HomeScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("💡 How it works", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MeeraOnSurface)
                     Spacer(Modifier.height(8.dp))
-                    InfoItem("1. Enter your Telegram Bot Token from @BotFather")
-                    InfoItem("2. Generate or paste an encryption key")
-                    InfoItem("3. Configure Ollama host in Settings")
-                    InfoItem("4. Hit Run Bot — Meera goes online!")
-                    InfoItem("5. Users add their own API keys via /start")
+                    InfoItem("1. Configure Ollama host in Settings")
+                    InfoItem("2. Hit Run Bot — Meera goes online!")
+                    InfoItem("3. Users add their own API keys via /start")
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "🔒 All API keys are encrypted. Each user provides their own keys.",
+                        "🔒 Encryption key was generated at login and is tied to your bot.",
                         fontSize = 12.sp,
                         color = MeeraGrayLight,
                     )
