@@ -1,5 +1,6 @@
 package com.example.meeraai.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -27,13 +28,56 @@ fun SettingsScreen(
     ollamaHost: String,
     ollamaModel: String,
     elevenlabsVoiceId: String,
-    onBotNameChange: (String) -> Unit,
-    onCustomSystemPromptChange: (String) -> Unit,
-    onOllamaHostChange: (String) -> Unit,
-    onOllamaModelChange: (String) -> Unit,
-    onElevenlabsVoiceIdChange: (String) -> Unit,
+    onSave: (String, String, String, String, String) -> Unit,
     onBack: () -> Unit,
 ) {
+    // Local editable state
+    var localBotName by remember { mutableStateOf(botName) }
+    var localPrompt by remember { mutableStateOf(customSystemPrompt) }
+    var localOllamaHost by remember { mutableStateOf(ollamaHost) }
+    var localOllamaModel by remember { mutableStateOf(ollamaModel) }
+    var localVoiceId by remember { mutableStateOf(elevenlabsVoiceId) }
+
+    // Saved snapshot to detect changes
+    var savedBotName by remember { mutableStateOf(botName) }
+    var savedPrompt by remember { mutableStateOf(customSystemPrompt) }
+    var savedOllamaHost by remember { mutableStateOf(ollamaHost) }
+    var savedOllamaModel by remember { mutableStateOf(ollamaModel) }
+    var savedVoiceId by remember { mutableStateOf(elevenlabsVoiceId) }
+
+    val hasUnsavedChanges = localBotName != savedBotName ||
+        localPrompt != savedPrompt ||
+        localOllamaHost != savedOllamaHost ||
+        localOllamaModel != savedOllamaModel ||
+        localVoiceId != savedVoiceId
+
+    var showDiscardDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = hasUnsavedChanges) {
+        showDiscardDialog = true
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("Unsaved Changes", fontWeight = FontWeight.SemiBold) },
+            text = { Text("You have unsaved changes. Are you sure you want to go back?") },
+            confirmButton = {
+                TextButton(onClick = { showDiscardDialog = false; onBack() }) {
+                    Text("Discard", color = MeeraPink)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text("Keep Editing", color = MeeraPurpleLight)
+                }
+            },
+            containerColor = MeeraSurfaceVariant,
+            titleContentColor = MeeraOnSurface,
+            textContentColor = MeeraGrayLight,
+        )
+    }
+
     val scrollState = rememberScrollState()
 
     Scaffold(
@@ -41,8 +85,26 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text("Settings", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        if (hasUnsavedChanges) showDiscardDialog = true else onBack()
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MeeraOnSurface)
+                    }
+                },
+                actions = {
+                    if (hasUnsavedChanges) {
+                        TextButton(
+                            onClick = {
+                                onSave(localBotName, localPrompt, localOllamaHost, localOllamaModel, localVoiceId)
+                                savedBotName = localBotName
+                                savedPrompt = localPrompt
+                                savedOllamaHost = localOllamaHost
+                                savedOllamaModel = localOllamaModel
+                                savedVoiceId = localVoiceId
+                            },
+                        ) {
+                            Text("Save", color = MeeraPurpleLight, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -64,8 +126,8 @@ fun SettingsScreen(
             SettingsSection(title = "🤖 Bot Identity") {
                 SettingsTextField(
                     label = "Bot Name",
-                    value = botName,
-                    onValueChange = onBotNameChange,
+                    value = localBotName,
+                    onValueChange = { localBotName = it },
                     placeholder = "Meera",
                 )
                 Spacer(Modifier.height(12.dp))
@@ -92,8 +154,7 @@ fun SettingsScreen(
 
             // ── Bot Behavior / Personality ──
             SettingsSection(title = "🎭 Behavior & Personality") {
-                var localPrompt by remember { mutableStateOf(customSystemPrompt) }
-                LaunchedEffect(customSystemPrompt) { localPrompt = customSystemPrompt }
+
                 Text(
                     "Custom System Prompt",
                     fontSize = 13.sp,
@@ -103,7 +164,7 @@ fun SettingsScreen(
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = localPrompt,
-                    onValueChange = { localPrompt = it; onCustomSystemPromptChange(it) },
+                    onValueChange = { localPrompt = it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 160.dp),
@@ -153,15 +214,15 @@ fun SettingsScreen(
             SettingsSection(title = "🤖 Ollama Configuration") {
                 SettingsTextField(
                     label = "Ollama Host URL",
-                    value = ollamaHost,
-                    onValueChange = onOllamaHostChange,
+                    value = localOllamaHost,
+                    onValueChange = { localOllamaHost = it },
                     placeholder = "https://your-ollama-cloud-endpoint",
                 )
                 Spacer(Modifier.height(12.dp))
                 SettingsTextField(
                     label = "Model Name",
-                    value = ollamaModel,
-                    onValueChange = onOllamaModelChange,
+                    value = localOllamaModel,
+                    onValueChange = { localOllamaModel = it },
                     placeholder = "gemini-3-flash-preview:cloud",
                 )
 
@@ -191,8 +252,8 @@ fun SettingsScreen(
             SettingsSection(title = "🎙 Voice Settings") {
                 SettingsTextField(
                     label = "Default Voice ID",
-                    value = elevenlabsVoiceId,
-                    onValueChange = onElevenlabsVoiceIdChange,
+                    value = localVoiceId,
+                    onValueChange = { localVoiceId = it },
                     placeholder = "21m00Tcm4TlvDq8ikWAM",
                 )
                 Spacer(Modifier.height(12.dp))
@@ -265,14 +326,12 @@ private fun SettingsTextField(
     onValueChange: (String) -> Unit,
     placeholder: String,
 ) {
-    var localValue by remember { mutableStateOf(value) }
-    LaunchedEffect(value) { localValue = value }
     Column {
         Text(label, fontSize = 13.sp, color = MeeraGrayLight, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(4.dp))
         OutlinedTextField(
-            value = localValue,
-            onValueChange = { localValue = it; onValueChange(it) },
+            value = value,
+            onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(placeholder, color = MeeraGray, fontSize = 14.sp) },
             colors = OutlinedTextFieldDefaults.colors(

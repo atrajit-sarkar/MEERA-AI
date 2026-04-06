@@ -108,11 +108,9 @@ fun MeeraApp(viewModel: BotViewModel = viewModel()) {
                 ollamaHost = ollamaHost,
                 ollamaModel = ollamaModel,
                 elevenlabsVoiceId = elevenlabsVoiceId,
-                onBotNameChange = { viewModel.saveBotName(it) },
-                onCustomSystemPromptChange = { viewModel.saveCustomSystemPrompt(it) },
-                onOllamaHostChange = { viewModel.saveOllamaHost(it) },
-                onOllamaModelChange = { viewModel.saveOllamaModel(it) },
-                onElevenlabsVoiceIdChange = { viewModel.saveElevenlabsVoiceId(it) },
+                onSave = { name, prompt, host, model, voiceId ->
+                    viewModel.saveAllSettings(name, prompt, host, model, voiceId)
+                },
                 onBack = { navController.popBackStack() },
             )
         }

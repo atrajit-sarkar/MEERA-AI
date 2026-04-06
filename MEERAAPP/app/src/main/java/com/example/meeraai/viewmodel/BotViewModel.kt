@@ -141,6 +141,23 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { settingsStore.saveElevenlabsVoiceId(voiceId) }
     }
 
+    fun saveAllSettings(
+        botName: String,
+        customSystemPrompt: String,
+        ollamaHost: String,
+        ollamaModel: String,
+        elevenlabsVoiceId: String,
+    ) {
+        viewModelScope.launch {
+            settingsStore.saveBotName(botName)
+            settingsStore.saveCustomSystemPrompt(customSystemPrompt)
+            settingsStore.saveOllamaHost(ollamaHost)
+            settingsStore.saveOllamaModel(ollamaModel)
+            settingsStore.saveElevenlabsVoiceId(elevenlabsVoiceId)
+            syncBotConfigToFirestore()
+        }
+    }
+
     fun generateEncryptionKey() {
         val key = EncryptionService.generateEncryptionKey()
         viewModelScope.launch { settingsStore.saveEncryptionKey(key) }
