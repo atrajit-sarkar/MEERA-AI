@@ -16,6 +16,8 @@ import com.example.meeraai.service.EncryptionService
 import com.example.meeraai.service.FirebaseService
 import com.example.meeraai.service.ReliableDns
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +43,8 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
+
+    private var firestoreSyncJob: Job? = null
 
     private val _botStatus = MutableStateFlow<BotStatus>(BotStatus.Stopped)
     val botStatus: StateFlow<BotStatus> = _botStatus
@@ -106,13 +110,21 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
     fun saveBotName(name: String) {
         viewModelScope.launch {
             settingsStore.saveBotName(name)
-            syncBotConfigToFirestore()
         }
+        debouncedFirestoreSync()
     }
 
     fun saveCustomSystemPrompt(prompt: String) {
         viewModelScope.launch {
             settingsStore.saveCustomSystemPrompt(prompt)
+        }
+        debouncedFirestoreSync()
+    }
+
+    private fun debouncedFirestoreSync() {
+        firestoreSyncJob?.cancel()
+        firestoreSyncJob = viewModelScope.launch {
+            delay(1000L)
             syncBotConfigToFirestore()
         }
     }

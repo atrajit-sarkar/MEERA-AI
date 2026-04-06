@@ -92,6 +92,8 @@ fun SettingsScreen(
 
             // ── Bot Behavior / Personality ──
             SettingsSection(title = "🎭 Behavior & Personality") {
+                var localPrompt by remember { mutableStateOf(customSystemPrompt) }
+                LaunchedEffect(customSystemPrompt) { localPrompt = customSystemPrompt }
                 Text(
                     "Custom System Prompt",
                     fontSize = 13.sp,
@@ -100,8 +102,8 @@ fun SettingsScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
-                    value = customSystemPrompt,
-                    onValueChange = onCustomSystemPromptChange,
+                    value = localPrompt,
+                    onValueChange = { localPrompt = it; onCustomSystemPromptChange(it) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 160.dp),
@@ -263,12 +265,14 @@ private fun SettingsTextField(
     onValueChange: (String) -> Unit,
     placeholder: String,
 ) {
+    var localValue by remember { mutableStateOf(value) }
+    LaunchedEffect(value) { localValue = value }
     Column {
         Text(label, fontSize = 13.sp, color = MeeraGrayLight, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(4.dp))
         OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
+            value = localValue,
+            onValueChange = { localValue = it; onValueChange(it) },
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(placeholder, color = MeeraGray, fontSize = 14.sp) },
             colors = OutlinedTextFieldDefaults.colors(
