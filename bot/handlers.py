@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import random
+import time
 import uuid
 
 from aiogram import Bot, Router, F
@@ -18,6 +19,7 @@ from services.firebase_service import (
     save_message,
     get_user_profile,
     get_user,
+    create_or_update_user,
 )
 from services.error_messages import get_friendly_error
 from services.key_manager import user_has_ollama_keys, user_has_elevenlabs_keys
@@ -142,6 +144,9 @@ async def handle_text_message(message: Message, bot: Bot) -> None:
     user_id = message.from_user.id
     user_text = message.text
 
+    # Update last interaction timestamp
+    await create_or_update_user(user_id, {"last_interaction": time.time(), "chat_id": message.chat.id, "proactive_sent": False})
+
     # Check if user has keys
     if not await user_has_ollama_keys(user_id):
         await message.answer(await get_friendly_error("no_keys"))
@@ -201,6 +206,9 @@ async def handle_text_message(message: Message, bot: Bot) -> None:
 @router.message(F.voice)
 async def handle_voice_message(message: Message, bot: Bot) -> None:
     user_id = message.from_user.id
+
+    # Update last interaction timestamp
+    await create_or_update_user(user_id, {"last_interaction": time.time(), "chat_id": message.chat.id, "proactive_sent": False})
 
     # Check if user has keys (need both Ollama for AI + ElevenLabs for STT)
     if not await user_has_ollama_keys(user_id):

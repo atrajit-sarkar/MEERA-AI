@@ -12,6 +12,7 @@ from aiogram.enums import ParseMode
 
 from config import Config
 from services.firebase_service import init_firebase, seed_error_messages
+from services.proactive import proactive_loop
 from bot.commands import router as commands_router
 from bot.handlers import router as handlers_router
 
@@ -89,6 +90,10 @@ async def main() -> None:
     dp.shutdown.register(on_shutdown)
 
     logger.info("Starting Meera AI Telegram Bot...")
+
+    # Start proactive messaging background task
+    asyncio.create_task(proactive_loop(bot))
+
     await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
 
 
