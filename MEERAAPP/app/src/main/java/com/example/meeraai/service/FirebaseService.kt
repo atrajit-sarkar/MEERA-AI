@@ -428,7 +428,19 @@ class FirebaseService(private val context: Context) {
         return count
     }
 
-    // ─── Error Messages ────────────────────────────────────────
+    // ─── Bot App Config (shared via Firestore) ──────────────────
+
+    suspend fun getBotAppConfig(): Map<String, Any?> {
+        val doc = firestoreGet("app_config/bot") ?: return emptyMap()
+        val fields = doc["fields"]?.jsonObject ?: return emptyMap()
+        return fromFirestoreFields(fields)
+    }
+
+    suspend fun saveBotAppConfig(data: Map<String, Any?>) {
+        firestoreSet("app_config/bot", toFirestoreFields(data))
+    }
+
+    // ─── Error Messages ──────────────────────────────────────────
 
     suspend fun getErrorMessages(category: String): List<String> {
         val doc = firestoreGet("error_messages/$category") ?: return emptyList()

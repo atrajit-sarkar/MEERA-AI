@@ -235,3 +235,12 @@ async def get_user_profile(user_id: int) -> dict:
 
 async def update_tone_profile(user_id: int, tone: str, reply_length: str) -> None:
     await create_or_update_user(user_id, {"tone": tone, "reply_length": reply_length})
+
+
+# ─── Bot App Config (shared via Firestore) ────────────────────────
+
+async def get_bot_app_config() -> dict:
+    """Fetch bot config from app_config/bot document (set by the Android app)."""
+    db = get_db()
+    doc = await db.collection("app_config").document("bot").get()
+    return doc.to_dict() if doc.exists else {}

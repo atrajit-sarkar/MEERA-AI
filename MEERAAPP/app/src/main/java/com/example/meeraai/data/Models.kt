@@ -9,6 +9,7 @@ data class BotConfig(
     val firebaseDatabaseId: String = "(default)",
     val encryptionKey: String = "s7lUp2gY1E6NaSGSEOMvngjSxrUD6_aomM3yqYsdSbo=",
     val botName: String = "Meera",
+    val customSystemPrompt: String = "",
     val ollamaHost: String = "https://ollama.com",
     val ollamaModel: String = "gemini-3-flash-preview:cloud",
     val elevenlabsDefaultVoiceId: String = "21m00Tcm4TlvDq8ikWAM",

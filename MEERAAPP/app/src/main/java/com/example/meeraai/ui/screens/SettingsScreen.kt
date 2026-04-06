@@ -23,10 +23,12 @@ import com.example.meeraai.ui.theme.*
 @Composable
 fun SettingsScreen(
     botName: String,
+    customSystemPrompt: String,
     ollamaHost: String,
     ollamaModel: String,
     elevenlabsVoiceId: String,
     onBotNameChange: (String) -> Unit,
+    onCustomSystemPromptChange: (String) -> Unit,
     onOllamaHostChange: (String) -> Unit,
     onOllamaModelChange: (String) -> Unit,
     onElevenlabsVoiceIdChange: (String) -> Unit,
@@ -78,7 +80,64 @@ fun SettingsScreen(
                         Icon(Icons.Filled.Person, contentDescription = null, tint = MeeraPurpleLight, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            "The bot will introduce itself with this name and use it throughout all conversations. Restart the bot after changing.",
+                            "The bot will introduce itself with this name and use it throughout all conversations. Synced to cloud in real-time.",
+                            fontSize = 12.sp,
+                            color = MeeraGrayLight,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // ── Bot Behavior / Personality ──
+            SettingsSection(title = "🎭 Behavior & Personality") {
+                Text(
+                    "Custom System Prompt",
+                    fontSize = 13.sp,
+                    color = MeeraGrayLight,
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = customSystemPrompt,
+                    onValueChange = onCustomSystemPromptChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 160.dp),
+                    placeholder = {
+                        Text(
+                            "Leave empty to use default personality. Or write your own:\n\nYou're Luna. A chill girl who loves anime and gaming...",
+                            color = MeeraGray,
+                            fontSize = 13.sp,
+                        )
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MeeraOnSurface,
+                        unfocusedTextColor = MeeraOnSurface,
+                        cursorColor = MeeraPurpleLight,
+                        focusedBorderColor = MeeraPurple,
+                        unfocusedBorderColor = MeeraSurface,
+                        focusedContainerColor = MeeraSurface,
+                        unfocusedContainerColor = MeeraSurface,
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                    maxLines = 12,
+                )
+                Spacer(Modifier.height(12.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MeeraPink.copy(alpha = 0.08f)),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MeeraPinkLight, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "This completely overrides the bot's default personality. Write who the bot is, how it talks, and any rules. Synced to both the app and the Python backend in real-time via Firestore.",
                             fontSize = 12.sp,
                             color = MeeraGrayLight,
                         )

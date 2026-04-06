@@ -47,6 +47,10 @@ class TelegramBotService(
     private var proactiveJob: Job? = null
     private var offset = 0L
 
+    // Live bot config fetched from Firestore (app_config/bot)
+    @Volatile private var liveBotName: String = config.botName
+    @Volatile private var liveSystemPrompt: String = config.customSystemPrompt
+
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
     val logs: StateFlow<List<LogEntry>> = _logs
 
@@ -71,6 +75,17 @@ class TelegramBotService(
             log("INFO", "Firebase", "Firestore connected (project: meeraai-482bb)")
             // Seed default error messages if needed
             firebase.seedErrorMessages()
+            // Fetch live bot config from Firestore
+            try {
+                val appConfig = firebase.getBotAppConfig()
+                val fbName = appConfig["bot_name"] as? String
+                val fbPrompt = appConfig["custom_system_prompt"] as? String
+                if (!fbName.isNullOrBlank()) liveBotName = fbName
+                if (!fbPrompt.isNullOrBlank()) liveSystemPrompt = fbPrompt
+                log("INFO", "Config", "Bot identity: $liveBotName")
+            } catch (e: Exception) {
+                log("WARN", "Config", "Could not fetch app config: ${e.message}")
+            }
         } catch (e: Exception) {
             log("WARN", "Firebase", "Init failed — running with local cache only: ${e.message}")
         }
@@ -920,7 +935,7 @@ class TelegramBotService(
         val user = users[userId] ?: throw RuntimeException("no_keys")
         if (user.ollamaKeys.isEmpty()) throw RuntimeException("no_keys")
 
-        val messages = OllamaService.buildMessages(userMessage, chatHistory, userProfile, config.botName)
+        val messages = OllamaService.buildMessages(userMessage, chatHistory, userProfile, liveBotName, liveSystemPrompt.ifBlank { null })
         var lastError: Exception? = null
 
         for (encKey in user.ollamaKeys) {

@@ -86,8 +86,13 @@ Keep it SHORT. This is chat, not email."""
         chatHistory: List<OllamaMessage>,
         userProfile: Map<String, String?>,
         botName: String = "Meera",
+        customSystemPrompt: String? = null,
     ): List<OllamaMessage> {
-        var systemPrompt = getSystemPrompt(botName)
+        var systemPrompt = if (!customSystemPrompt.isNullOrBlank()) {
+            customSystemPrompt
+        } else {
+            getSystemPrompt(botName)
+        }
 
         // Inject comfort-tier personality
         val tier = getComfortTier(chatHistory.size)

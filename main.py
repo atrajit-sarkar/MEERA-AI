@@ -12,6 +12,7 @@ from aiogram.enums import ParseMode
 
 from config import Config
 from services.firebase_service import init_firebase, seed_error_messages
+from services.ollama_service import reload_bot_config
 from services.proactive import proactive_loop
 from bot.commands import router as commands_router
 from bot.handlers import router as handlers_router
@@ -47,6 +48,14 @@ async def on_startup(bot: Bot) -> None:
 
     # Create temp directory
     os.makedirs(Config.TEMP_DIR, exist_ok=True)
+
+    # Load bot config (name/personality) from Firestore
+    logger.info("Loading bot config from Firestore...")
+    try:
+        await reload_bot_config()
+        logger.info("Bot config loaded from Firestore.")
+    except Exception as e:
+        logger.warning(f"Could not load bot config from Firestore (using defaults): {e}")
 
     me = await bot.get_me()
     logger.info(f"Bot started: @{me.username} ({me.full_name})")

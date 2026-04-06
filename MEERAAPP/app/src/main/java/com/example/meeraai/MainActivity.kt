@@ -45,6 +45,7 @@ fun MeeraApp(viewModel: BotViewModel = viewModel()) {
     val isVerifying by viewModel.isVerifying.collectAsState()
     val loginError by viewModel.loginError.collectAsState()
     val botName by viewModel.botName.collectAsState()
+    val customSystemPrompt by viewModel.customSystemPrompt.collectAsState()
     val ollamaHost by viewModel.ollamaHost.collectAsState()
     val ollamaModel by viewModel.ollamaModel.collectAsState()
     val elevenlabsVoiceId by viewModel.elevenlabsVoiceId.collectAsState()
@@ -103,10 +104,12 @@ fun MeeraApp(viewModel: BotViewModel = viewModel()) {
         composable("settings") {
             SettingsScreen(
                 botName = botName,
+                customSystemPrompt = customSystemPrompt,
                 ollamaHost = ollamaHost,
                 ollamaModel = ollamaModel,
                 elevenlabsVoiceId = elevenlabsVoiceId,
                 onBotNameChange = { viewModel.saveBotName(it) },
+                onCustomSystemPromptChange = { viewModel.saveCustomSystemPrompt(it) },
                 onOllamaHostChange = { viewModel.saveOllamaHost(it) },
                 onOllamaModelChange = { viewModel.saveOllamaModel(it) },
                 onElevenlabsVoiceIdChange = { viewModel.saveElevenlabsVoiceId(it) },

@@ -8,9 +8,47 @@ from ollama import AsyncClient, ResponseError
 
 from config import Config
 from services.encryption import decrypt_key
-from services.firebase_service import get_user_api_keys
+from services.firebase_service import get_user_api_keys, get_bot_app_config
 
 logger = logging.getLogger(__name__)
+
+# Cached bot app config from Firestore
+_cached_bot_name: str = "Meera"
+_cached_custom_prompt: str = ""
+_config_loaded: bool = False
+
+
+async def _ensure_bot_config():
+    """Fetch bot_name / custom_system_prompt from Firestore once."""
+    global _cached_bot_name, _cached_custom_prompt, _config_loaded
+    if _config_loaded:
+        return
+    try:
+        app_config = await get_bot_app_config()
+        name = app_config.get("bot_name", "")
+        prompt = app_config.get("custom_system_prompt", "")
+        if name:
+            _cached_bot_name = name
+        if prompt:
+            _cached_custom_prompt = prompt
+        _config_loaded = True
+        logger.info(f"Bot config loaded — name: {_cached_bot_name}, custom prompt: {'yes' if _cached_custom_prompt else 'no'}")
+    except Exception as e:
+        logger.warning(f"Could not fetch bot app config: {e}")
+        _config_loaded = True  # don't retry every call
+
+
+def reload_bot_config():
+    """Force re-fetch of bot config on next call."""
+    global _config_loaded
+    _config_loaded = False
+
+
+def _get_system_prompt() -> str:
+    """Return the active system prompt — custom if set, otherwise default with bot name."""
+    if _cached_custom_prompt:
+        return _cached_custom_prompt
+    return MEERA_SYSTEM_PROMPT.replace("You're Meera.", f"You're {_cached_bot_name}.")
 
 # System prompt for Meera persona — base identity (comfort tiers added dynamically)
 MEERA_SYSTEM_PROMPT = """You're Meera. A real girl chatting on Telegram. Not an assistant, not a bot — just you.
@@ -81,6 +119,7 @@ async def get_ai_response(
     user_profile: dict,
 ) -> str:
     """Get AI response using the user's own Ollama API keys with failover."""
+    await _ensure_bot_config()
     keys_data = await get_user_api_keys(user_id)
     ollama_keys = keys_data.get("ollama_keys", [])
 
@@ -174,7 +213,7 @@ def _build_messages(
     user_profile: dict,
 ) -> list[dict]:
     """Build the messages array for Ollama with persona context."""
-    system_prompt = MEERA_SYSTEM_PROMPT
+    system_prompt = _get_system_prompt()
 
     # Inject comfort-tier personality based on how many messages exchanged
     tier = _get_comfort_tier(len(chat_history))

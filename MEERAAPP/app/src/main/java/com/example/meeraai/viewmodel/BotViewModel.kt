@@ -13,6 +13,7 @@ import com.example.meeraai.data.LogEntry
 import com.example.meeraai.data.SettingsStore
 import com.example.meeraai.service.BotForegroundService
 import com.example.meeraai.service.EncryptionService
+import com.example.meeraai.service.FirebaseService
 import com.example.meeraai.service.ReliableDns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +53,7 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
     val botToken = settingsStore.botToken.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val encryptionKey = settingsStore.encryptionKey.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val botName = settingsStore.botName.stateIn(viewModelScope, SharingStarted.Eagerly, "Meera")
+    val customSystemPrompt = settingsStore.customSystemPrompt.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val ollamaHost = settingsStore.ollamaHost.stateIn(viewModelScope, SharingStarted.Eagerly, "https://ollama.com")
     val ollamaModel = settingsStore.ollamaModel.stateIn(viewModelScope, SharingStarted.Eagerly, "gemini-3-flash-preview:cloud")
     val elevenlabsVoiceId = settingsStore.elevenlabsVoiceId.stateIn(viewModelScope, SharingStarted.Eagerly, "21m00Tcm4TlvDq8ikWAM")
@@ -102,7 +104,17 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun saveBotName(name: String) {
-        viewModelScope.launch { settingsStore.saveBotName(name) }
+        viewModelScope.launch {
+            settingsStore.saveBotName(name)
+            syncBotConfigToFirestore()
+        }
+    }
+
+    fun saveCustomSystemPrompt(prompt: String) {
+        viewModelScope.launch {
+            settingsStore.saveCustomSystemPrompt(prompt)
+            syncBotConfigToFirestore()
+        }
     }
 
     fun saveOllamaHost(host: String) {
@@ -221,5 +233,21 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
     fun stopBot() {
         BotForegroundService.stop(getApplication())
         _botStatus.value = BotStatus.Stopped
+    }
+
+    private fun syncBotConfigToFirestore() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val firebase = FirebaseService(getApplication())
+                firebase.init(dbId = "pussy")
+                val config = settingsStore.getBotConfig()
+                firebase.saveBotAppConfig(
+                    mapOf(
+                        "bot_name" to config.botName,
+                        "custom_system_prompt" to config.customSystemPrompt,
+                    )
+                )
+            } catch (_: Exception) { /* best-effort sync */ }
+        }
     }
 }
