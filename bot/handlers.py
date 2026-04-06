@@ -11,7 +11,7 @@ from aiogram import Bot, Router, F
 from aiogram.types import Message, FSInputFile, ReactionTypeEmoji
 
 from config import Config
-from services.ollama_service import get_ai_response, should_reply_with_voice, pick_reaction_emoji
+from services.ollama_service import get_ai_response, should_reply_with_voice, pick_reaction_emoji, pick_sticker_emoji
 from services.elevenlabs_service import text_to_speech, cleanup_audio_file
 from services.stt_service import transcribe_voice
 from services.firebase_service import (
@@ -23,6 +23,7 @@ from services.firebase_service import (
 )
 from services.error_messages import get_friendly_error
 from services.key_manager import user_has_ollama_keys, user_has_elevenlabs_keys
+from services.sticker_service import pick_sticker, should_send_sticker, get_user_sticker_packs
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -139,6 +140,36 @@ async def _send_text_reply(message: Message, text: str) -> None:
         await message.answer(text)
 
 
+async def _maybe_send_sticker(
+    bot: Bot, message: Message, user_id: int,
+    ai_response: str, chat_history: list[dict], msg_count: int,
+) -> None:
+    """Occasionally send a sticker after a reply — like a real person would."""
+    if not should_send_sticker(msg_count):
+        return
+
+    # Check if user has any sticker packs
+    packs = await get_user_sticker_packs(user_id)
+    if not packs:
+        return
+
+    try:
+        # Ask AI to pick a mood emoji for sticker selection
+        emoji = await pick_sticker_emoji(user_id, ai_response, chat_history)
+        if not emoji:
+            return
+
+        sticker_id = await pick_sticker(bot, user_id, emoji)
+        if not sticker_id:
+            return
+
+        # Small delay before sending sticker — feels natural
+        await asyncio.sleep(random.uniform(0.5, 1.5))
+        await bot.send_sticker(message.chat.id, sticker_id)
+    except Exception as e:
+        logger.debug(f"Could not send sticker for user {user_id}: {e}")
+
+
 @router.message(F.text)
 async def handle_text_message(message: Message, bot: Bot) -> None:
     user_id = message.from_user.id
@@ -190,6 +221,9 @@ async def handle_text_message(message: Message, bot: Bot) -> None:
             # Text reply with typing indicator
             await _simulate_typing(bot, message.chat.id, len(ai_response))
             await _send_text_reply(message, ai_response)
+
+        # Maybe send a sticker after the reply
+        await _maybe_send_sticker(bot, message, user_id, ai_response, chat_history, len(chat_history))
 
     except ValueError as e:
         error_category = str(e)
@@ -277,6 +311,9 @@ async def handle_voice_message(message: Message, bot: Bot) -> None:
             # Text reply — show typing indicator
             await _simulate_typing(bot, message.chat.id, len(ai_response))
             await _send_text_reply(message, ai_response)
+
+        # Maybe send a sticker after the reply
+        await _maybe_send_sticker(bot, message, user_id, ai_response, chat_history, len(chat_history))
 
     except ValueError as e:
         error_category = str(e)

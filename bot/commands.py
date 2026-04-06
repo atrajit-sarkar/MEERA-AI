@@ -21,6 +21,11 @@ from services.key_manager import (
     list_user_keys,
     remove_user_key,
 )
+from services.sticker_service import (
+    add_sticker_pack,
+    remove_sticker_pack,
+    get_user_sticker_packs,
+)
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -45,6 +50,11 @@ class VoiceStates(StatesGroup):
 
 class ClearStates(StatesGroup):
     waiting_for_confirm = State()
+
+
+class StickerStates(StatesGroup):
+    waiting_for_pack_name = State()
+    waiting_for_remove_pack = State()
 
 
 # ─── /start ────────────────────────────────────────────────────────
@@ -128,6 +138,9 @@ async def cmd_help(message: Message) -> None:
         "👤 /profile — Set your name & bio\n"
         "🎭 /tone — Set formal/casual + short/long\n"
         "🎤 /setvoice — Use your own ElevenLabs voice\n"
+        "🎨 /addstickers — Add a sticker pack for me to use\n"
+        "📋 /stickers — View your sticker packs\n"
+        "🗑 /removestickers — Remove a sticker pack\n"
         "🗣 /talk — Toggle voice-only mode\n"
         "🧹 /clear — Wipe chat history & start fresh\n\n"
         "**💡 Tips:**\n"
@@ -465,3 +478,94 @@ async def process_clear(message: Message, state: FSMContext, bot: Bot) -> None:
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "Hey! I'm Meera 👋 feels like we're meeting for the first time haha"
     )
+
+
+# ─── /addstickers — Add a sticker pack ────────────────────────────
+
+@router.message(Command("addstickers"))
+async def cmd_addstickers(message: Message, state: FSMContext) -> None:
+    await state.set_state(StickerStates.waiting_for_pack_name)
+    await message.answer(
+        "🎨 Send me the **name** of a Telegram sticker pack!\n\n"
+        "💡 How to find it:\n"
+        "1️⃣ Open any sticker from the pack\n"
+        "2️⃣ Tap the pack name at the top\n"
+        "3️⃣ Look at the share link — it's the part after `addstickers/`\n"
+        "   Example: `AnimatedCats` from t.me/addstickers/AnimatedCats\n\n"
+        "I'll learn the stickers and send them in our chats! 🎉",
+        parse_mode="Markdown",
+    )
+
+
+@router.message(StickerStates.waiting_for_pack_name, F.text)
+async def process_addstickers(message: Message, state: FSMContext, bot: Bot) -> None:
+    pack_name = message.text.strip()
+    await state.clear()
+
+    # Validate the pack exists
+    try:
+        sticker_set = await bot.get_sticker_set(pack_name)
+        count = len(sticker_set.stickers)
+    except Exception:
+        await message.answer(
+            f"❌ Couldn't find a sticker pack called `{pack_name}`.\n"
+            "Make sure you're using the exact pack name from the share link!",
+            parse_mode="Markdown",
+        )
+        return
+
+    await add_sticker_pack(message.from_user.id, pack_name)
+    await message.answer(
+        f"✅ Added **{sticker_set.title}** ({count} stickers)!\n"
+        "I'll start using these in our chats 🎨",
+        parse_mode="Markdown",
+    )
+
+
+# ─── /stickers — List sticker packs ───────────────────────────────
+
+@router.message(Command("stickers"))
+async def cmd_stickers(message: Message) -> None:
+    packs = await get_user_sticker_packs(message.from_user.id)
+    if not packs:
+        await message.answer(
+            "You haven't added any sticker packs yet! 🎨\n"
+            "Use /addstickers to add one."
+        )
+        return
+
+    pack_list = "\n".join(f"• `{p}`" for p in packs)
+    await message.answer(
+        f"🎨 **Your Sticker Packs:**\n\n{pack_list}\n\n"
+        "Use /removestickers to remove one.",
+        parse_mode="Markdown",
+    )
+
+
+# ─── /removestickers — Remove a sticker pack ──────────────────────
+
+@router.message(Command("removestickers"))
+async def cmd_removestickers(message: Message, state: FSMContext) -> None:
+    packs = await get_user_sticker_packs(message.from_user.id)
+    if not packs:
+        await message.answer("You don't have any sticker packs to remove! 🤷")
+        return
+
+    pack_list = "\n".join(f"• `{p}`" for p in packs)
+    await state.set_state(StickerStates.waiting_for_remove_pack)
+    await message.answer(
+        f"Which pack to remove? Reply with the pack name:\n\n{pack_list}",
+        parse_mode="Markdown",
+    )
+
+
+@router.message(StickerStates.waiting_for_remove_pack, F.text)
+async def process_removestickers(message: Message, state: FSMContext) -> None:
+    pack_name = message.text.strip()
+    await state.clear()
+
+    removed = await remove_sticker_pack(message.from_user.id, pack_name)
+    if removed:
+        await message.answer(f"✅ Removed `{pack_name}` from your sticker packs!", parse_mode="Markdown")
+    else:
+        await message.answer(f"❌ `{pack_name}` wasn't in your packs. Check /stickers for your list.", parse_mode="Markdown")

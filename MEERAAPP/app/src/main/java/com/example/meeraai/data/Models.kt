@@ -35,6 +35,7 @@ data class UserData(
     val lastInteraction: Double = 0.0,
     val chatId: Long = 0,
     val proactiveSent: Boolean = false,
+    val stickerPacks: List<String> = emptyList(),
 )
 
 @Serializable

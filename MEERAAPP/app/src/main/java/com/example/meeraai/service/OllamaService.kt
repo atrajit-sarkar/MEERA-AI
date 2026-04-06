@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 
 /**
  * Ollama Cloud AI service — mirrors the Python ollama_service.py
@@ -227,4 +228,52 @@ Keep it SHORT. This is chat, not email."""
         "comfortable" to 6L * 3600 * 1000,
         "close" to 2L * 3600 * 1000,
     )
+
+    // ─── Sticker Emoji Picker ──────────────────────────────────
+
+    private const val STICKER_PICK_PROMPT =
+        "You're picking a sticker to send in a Telegram chat. " +
+        "Based on the conversation, reply with EXACTLY ONE emoji that best represents " +
+        "the mood or feeling you'd express with a sticker right now. " +
+        "Think about what emotion or reaction fits — happy, sad, laughing, love, cool, angry, confused, etc. " +
+        "Just reply with ONE emoji. Nothing else."
+
+    suspend fun pickStickerEmoji(
+        host: String,
+        model: String,
+        apiKey: String,
+        aiResponse: String,
+        chatHistory: List<OllamaMessage>,
+    ): String? {
+        val messages = mutableListOf(OllamaMessage("system", STICKER_PICK_PROMPT))
+        for (msg in chatHistory.takeLast(4)) {
+            if (msg.role in listOf("user", "assistant") && msg.content.isNotBlank()) {
+                messages.add(msg)
+            }
+        }
+        messages.add(OllamaMessage("assistant", aiResponse))
+        messages.add(OllamaMessage("user", "Pick a sticker emoji for what I just said."))
+
+        return try {
+            val raw = callOllama(host, model, apiKey, messages)
+            val emoji = raw.trim()
+            if (emoji.length <= 4 && emoji.isNotBlank()) emoji
+            else {
+                // Try to extract first emoji from response
+                val emojiRegex = Regex("[\\x{1F600}-\\x{1F64F}\\x{1F300}-\\x{1F5FF}\\x{1F680}-\\x{1F6FF}\\x{1F900}-\\x{1F9FF}\\x{2600}-\\x{26FF}\\x{2700}-\\x{27BF}]")
+                emojiRegex.find(raw)?.value
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun shouldSendSticker(msgCount: Int): Boolean {
+        return when {
+            msgCount < 8 -> false                          // Stranger — never
+            msgCount < 25 -> Random.nextDouble() < 0.04    // Acquaintance — 4%
+            msgCount < 60 -> Random.nextDouble() < 0.12    // Comfortable — 12%
+            else -> Random.nextDouble() < 0.22             // Close — 22%
+        }
+    }
 }

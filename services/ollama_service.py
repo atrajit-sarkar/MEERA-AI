@@ -320,3 +320,55 @@ async def pick_reaction_emoji(
             logger.debug(f"Reaction pick failed for user {user_id}: {e}")
             continue
     return None
+
+
+# ─── Sticker Emoji Picker ──────────────────────────────────────────
+
+_STICKER_PICK_PROMPT = (
+    "You're picking a sticker to send in a Telegram chat. "
+    "Based on the conversation, reply with EXACTLY ONE emoji that best represents "
+    "the mood or feeling you'd express with a sticker right now. "
+    "Think about what emotion or reaction fits — happy, sad, laughing, love, cool, angry, confused, etc. "
+    "Just reply with ONE emoji. Nothing else."
+)
+
+
+async def pick_sticker_emoji(
+    user_id: int, ai_response: str, chat_history: list[dict]
+) -> str | None:
+    """Ask the AI to pick an emoji representing the sticker mood for the current context."""
+    keys_data = await get_user_api_keys(user_id)
+    ollama_keys = keys_data.get("ollama_keys", [])
+    if not ollama_keys:
+        return None
+
+    messages = [{"role": "system", "content": _STICKER_PICK_PROMPT}]
+    for msg in chat_history[-4:]:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "assistant", "content": ai_response})
+    messages.append({"role": "user", "content": "Pick a sticker emoji for what I just said."})
+
+    for encrypted_key in ollama_keys:
+        try:
+            decrypted_key = decrypt_key(encrypted_key)
+            raw = await _call_ollama(decrypted_key, messages)
+            emoji = raw.strip()
+            # Return whatever emoji the AI picked — sticker packs have varied emojis
+            if len(emoji) <= 4 and emoji:
+                return emoji
+            # Try to extract first emoji from response
+            import re
+            found = re.findall(
+                r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF'
+                r'\U0001F1E0-\U0001F1FF\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F'
+                r'\U0001FA70-\U0001FAFF\U00002600-\U000026FF\U00002700-\U000027BF'
+                r'\U0000200D\U0000FE0F]+', raw
+            )
+            return found[0] if found else None
+        except Exception as e:
+            logger.debug(f"Sticker emoji pick failed for user {user_id}: {e}")
+            continue
+    return None

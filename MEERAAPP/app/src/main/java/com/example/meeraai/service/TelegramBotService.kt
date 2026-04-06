@@ -43,6 +43,11 @@ class TelegramBotService(
     private val chatHistories = ConcurrentHashMap<Long, MutableList<ChatMessage>>()
     private val fsmStates = ConcurrentHashMap<Long, String>() // user_id -> state name (transient)
 
+    // Sticker cache: userId -> { packName -> { emoji -> [fileId, ...] } }
+    private val stickerCache = ConcurrentHashMap<Long, MutableMap<String, Map<String, List<String>>>>()
+    private val stickerCacheTimestamps = ConcurrentHashMap<Long, Long>()
+    private val STICKER_CACHE_TTL = 2 * 3600 * 1000L // 2 hours
+
     private var pollingJob: Job? = null
     private var proactiveJob: Job? = null
     private var offset = 0L
@@ -270,6 +275,26 @@ class TelegramBotService(
         }
     }
 
+    private suspend fun sendSticker(chatId: Long, stickerFileId: String) {
+        try {
+            apiCall("sendSticker", buildJsonObject {
+                put("chat_id", chatId)
+                put("sticker", stickerFileId)
+            })
+        } catch (e: Exception) {
+            log("DEBUG", "Sticker", "Could not send sticker: ${e.message}")
+        }
+    }
+
+    private suspend fun getStickerSet(name: String): JsonObject? {
+        return try {
+            apiCall("getStickerSet", buildJsonObject { put("name", name) })
+        } catch (e: Exception) {
+            log("DEBUG", "Sticker", "Could not fetch sticker set '$name': ${e.message}")
+            null
+        }
+    }
+
     private suspend fun downloadFile(fileId: String, outputFile: File): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -438,6 +463,21 @@ class TelegramBotService(
                 fsmStates[userId] = "waiting_for_clear_confirm"
                 sendMessage(chatId, "🧹 *Are you sure you want to clear our entire chat history?*\n\nThis will:\n• Delete all messages from memory\n• Reset our relationship back to strangers\n• Meera won't remember anything from before\n\nType `yes` to confirm or `no` to cancel.")
             }
+            "addstickers" -> {
+                fsmStates[userId] = "waiting_for_sticker_pack"
+                sendMessage(chatId, "🎨 Send me the *name* of a Telegram sticker pack!\n\n💡 How to find it:\n1️⃣ Open any sticker from the pack\n2️⃣ Tap the pack name at the top\n3️⃣ Look at the share link — it's the part after `addstickers/`\n   Example: `AnimatedCats` from t.me/addstickers/AnimatedCats\n\nI'll learn the stickers and send them in our chats! 🎉")
+            }
+            "stickers" -> cmdStickers(userId, chatId)
+            "removestickers" -> {
+                val user = getOrCreateUser(userId)
+                if (user.stickerPacks.isEmpty()) {
+                    sendMessage(chatId, "You don't have any sticker packs to remove! 🤷")
+                } else {
+                    fsmStates[userId] = "waiting_for_remove_sticker_pack"
+                    val packList = user.stickerPacks.joinToString("\n") { "• `$it`" }
+                    sendMessage(chatId, "Which pack to remove? Reply with the pack name:\n\n$packList")
+                }
+            }
             else -> sendMessage(chatId, "Unknown command. Use /help to see available commands.")
         }
     }
@@ -553,6 +593,36 @@ class TelegramBotService(
                     sendMessage(chatId, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🧹 Memory cleared — $count messages forgotten\nEverything above this line, I don't remember.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nHey! I'm Meera 👋 feels like we're meeting for the first time haha")
                 }
             }
+            "waiting_for_sticker_pack" -> {
+                val packName = text.trim()
+                val stickerSet = getStickerSet(packName)
+                if (stickerSet == null) {
+                    sendMessage(chatId, "❌ Couldn't find a sticker pack called `$packName`.\nMake sure you're using the exact pack name from the share link!")
+                    return
+                }
+                val stickers = stickerSet["stickers"]?.jsonArray
+                val count = stickers?.size ?: 0
+                val title = stickerSet["title"]?.jsonPrimitive?.content ?: packName
+
+                val user = getOrCreateUser(userId)
+                if (packName !in user.stickerPacks) {
+                    updateUser(userId, user.copy(stickerPacks = user.stickerPacks + packName))
+                }
+                // Invalidate sticker cache
+                stickerCache.remove(userId)
+                sendMessage(chatId, "✅ Added *$title* ($count stickers)!\nI'll start using these in our chats 🎨")
+            }
+            "waiting_for_remove_sticker_pack" -> {
+                val packName = text.trim()
+                val user = getOrCreateUser(userId)
+                if (packName in user.stickerPacks) {
+                    updateUser(userId, user.copy(stickerPacks = user.stickerPacks - packName))
+                    stickerCache.remove(userId)
+                    sendMessage(chatId, "✅ Removed `$packName` from your sticker packs!")
+                } else {
+                    sendMessage(chatId, "❌ `$packName` wasn't in your packs. Check /stickers for your list.")
+                }
+            }
         }
     }
 
@@ -620,6 +690,9 @@ class TelegramBotService(
             "👤 /profile — Set your name & bio\n" +
             "🎭 /tone — Set formal/casual + short/long\n" +
             "🎤 /setvoice — Use your own ElevenLabs voice\n" +
+            "🎨 /addstickers — Add a sticker pack for me to use\n" +
+            "📋 /stickers — View your sticker packs\n" +
+            "🗑 /removestickers — Remove a sticker pack\n" +
             "🗣 /talk — Toggle voice-only mode\n" +
             "🧹 /clear — Wipe chat history & start fresh\n\n" +
             "*💡 Tips:*\n" +
@@ -730,6 +803,9 @@ class TelegramBotService(
                 sendTextReply(chatId, messageId, aiResponse)
             }
 
+            // Maybe send a sticker after the reply
+            maybeSendSticker(userId, chatId, aiResponse, ollamaHistory, chatHistory.size)
+
         } catch (e: Exception) {
             val errorMsg = when {
                 "invalid_key" in (e.message ?: "") -> ErrorMessages.getFriendlyError("invalid_key")
@@ -810,6 +886,9 @@ class TelegramBotService(
                 sendTextReply(chatId, messageId, aiResponse)
             }
 
+            // Maybe send a sticker after the reply
+            maybeSendSticker(userId, chatId, aiResponse, ollamaHistory, chatHistory.size)
+
         } catch (e: Exception) {
             val errorMsg = when {
                 "invalid_key" in (e.message ?: "") -> ErrorMessages.getFriendlyError("invalid_key")
@@ -842,6 +921,7 @@ class TelegramBotService(
                 "last_interaction" to user.lastInteraction,
                 "chat_id" to user.chatId,
                 "proactive_sent" to user.proactiveSent,
+                "sticker_packs" to user.stickerPacks,
             ))
         } catch (e: Exception) {
             log("WARN", "Firebase", "Failed to sync user $userId: ${e.message}")
@@ -1021,6 +1101,97 @@ class TelegramBotService(
         }
     }
 
+    // ─── Sticker Support ───────────────────────────────────────
+
+    private suspend fun cmdStickers(userId: Long, chatId: Long) {
+        val user = getOrCreateUser(userId)
+        if (user.stickerPacks.isEmpty()) {
+            sendMessage(chatId, "You haven't added any sticker packs yet! 🎨\nUse /addstickers to add one.")
+            return
+        }
+        val packList = user.stickerPacks.joinToString("\n") { "• `$it`" }
+        sendMessage(chatId, "🎨 *Your Sticker Packs:*\n\n$packList\n\nUse /removestickers to remove one.")
+    }
+
+    private suspend fun fetchStickerPacks(userId: Long): Map<String, Map<String, List<String>>> {
+        val now = System.currentTimeMillis()
+        val cachedAt = stickerCacheTimestamps[userId] ?: 0L
+        if (now - cachedAt < STICKER_CACHE_TTL) {
+            stickerCache[userId]?.let { return it }
+        }
+
+        val user = getOrCreateUser(userId)
+        val result = mutableMapOf<String, Map<String, List<String>>>()
+
+        for (packName in user.stickerPacks) {
+            try {
+                val stickerSet = getStickerSet(packName) ?: continue
+                val stickers = stickerSet["stickers"]?.jsonArray ?: continue
+                val emojiMap = mutableMapOf<String, MutableList<String>>()
+                for (s in stickers) {
+                    val obj = s.jsonObject
+                    val emoji = obj["emoji"]?.jsonPrimitive?.content ?: continue
+                    val fileId = obj["file_id"]?.jsonPrimitive?.content ?: continue
+                    emojiMap.getOrPut(emoji) { mutableListOf() }.add(fileId)
+                }
+                result[packName] = emojiMap
+            } catch (e: Exception) {
+                log("DEBUG", "Sticker", "Could not fetch pack '$packName': ${e.message}")
+            }
+        }
+
+        stickerCache[userId] = result
+        stickerCacheTimestamps[userId] = now
+        return result
+    }
+
+    private suspend fun pickStickerFileId(userId: Long, emoji: String): String? {
+        val packs = fetchStickerPacks(userId)
+        if (packs.isEmpty()) return null
+
+        // Collect all stickers matching this emoji
+        val matching = mutableListOf<String>()
+        for (packData in packs.values) {
+            matching.addAll(packData[emoji] ?: emptyList())
+        }
+
+        // Partial match fallback
+        if (matching.isEmpty()) {
+            for (packData in packs.values) {
+                for ((stickerEmoji, fileIds) in packData) {
+                    if (emoji in stickerEmoji || stickerEmoji in emoji) {
+                        matching.addAll(fileIds)
+                    }
+                }
+            }
+        }
+
+        return if (matching.isNotEmpty()) matching.random() else null
+    }
+
+    private suspend fun maybeSendSticker(
+        userId: Long, chatId: Long, aiResponse: String,
+        chatHistory: List<OllamaMessage>, msgCount: Int
+    ) {
+        if (!OllamaService.shouldSendSticker(msgCount)) return
+
+        val user = users[userId] ?: return
+        if (user.stickerPacks.isEmpty()) return
+
+        try {
+            val apiKey = getDecryptedOllamaKey(userId) ?: return
+            val emoji = OllamaService.pickStickerEmoji(
+                config.ollamaHost, config.ollamaModel, apiKey, aiResponse, chatHistory
+            ) ?: return
+
+            val stickerId = pickStickerFileId(userId, emoji) ?: return
+            delay(Random.nextLong(500, 1500))
+            sendSticker(chatId, stickerId)
+        } catch (e: Exception) {
+            log("DEBUG", "Sticker", "Could not send sticker for $userId: ${e.message}")
+        }
+    }
+
     // ─── Proactive Messaging — mirrors proactive.py ────────────
 
     private suspend fun checkProactiveMessages() {
@@ -1080,6 +1251,31 @@ class TelegramBotService(
                 }
 
                 saveChatMessage(userId, "assistant", aiMessage)
+
+                // Maybe send a sticker too (close/comfortable friends)
+                if (tier in listOf("close", "comfortable")) {
+                    val stickerChance = if (tier == "close") 0.20 else 0.08
+                    if (Random.nextDouble() < stickerChance && user.stickerPacks.isNotEmpty()) {
+                        try {
+                            val stickerApiKey = getDecryptedOllamaKey(userId)
+                            if (stickerApiKey != null) {
+                                val stickerEmoji = OllamaService.pickStickerEmoji(
+                                    config.ollamaHost, config.ollamaModel, stickerApiKey, aiMessage, ollamaHistory
+                                )
+                                if (stickerEmoji != null) {
+                                    val stickerId = pickStickerFileId(userId, stickerEmoji)
+                                    if (stickerId != null) {
+                                        delay(Random.nextLong(1000, 3000))
+                                        sendSticker(user.chatId, stickerId)
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            log("DEBUG", "Proactive", "Sticker failed for $userId: ${e.message}")
+                        }
+                    }
+                }
+
                 updateUser(userId, user.copy(proactiveSent = true))
                 log("INFO", "Proactive", "Sent ${if (useVoice) "voice" else "text"} to user $userId (tier: $tier)")
 

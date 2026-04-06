@@ -337,6 +337,7 @@ class FirebaseService(private val context: Context) {
             merged["last_interaction"] = existing.lastInteraction
             merged["chat_id"] = existing.chatId
             merged["proactive_sent"] = existing.proactiveSent
+            merged["sticker_packs"] = existing.stickerPacks
         }
 
         merged.putAll(data)
@@ -372,6 +373,7 @@ class FirebaseService(private val context: Context) {
             lastInteraction = (data["last_interaction"] as? Number)?.toDouble() ?: 0.0,
             chatId = (data["chat_id"] as? Number)?.toLong() ?: 0L,
             proactiveSent = (data["proactive_sent"] as? Boolean) ?: false,
+            stickerPacks = (data["sticker_packs"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
         )
     }
 

@@ -17,6 +17,8 @@ from services.firebase_service import (
 from services.ollama_service import get_ai_response, _get_comfort_tier
 from services.elevenlabs_service import text_to_speech, cleanup_audio_file
 from services.key_manager import user_has_ollama_keys, user_has_elevenlabs_keys
+from services.sticker_service import pick_sticker, get_user_sticker_packs
+from services.ollama_service import pick_sticker_emoji
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -162,6 +164,23 @@ async def _send_proactive_message(bot: Bot, user_data: dict) -> None:
 
         # Save to history so Meera remembers she texted first
         await save_message(user_id, "assistant", ai_message)
+
+        # Maybe send a sticker too (close friends only)
+        if tier in ("close", "comfortable"):
+            sticker_chance = 0.20 if tier == "close" else 0.08
+            if random.random() < sticker_chance:
+                packs = await get_user_sticker_packs(user_id)
+                if packs:
+                    try:
+                        emoji = await pick_sticker_emoji(user_id, ai_message, history)
+                        if emoji:
+                            from services.sticker_service import pick_sticker
+                            sticker_id = await pick_sticker(bot, user_id, emoji)
+                            if sticker_id:
+                                await asyncio.sleep(random.uniform(1.0, 3.0))
+                                await bot.send_sticker(chat_id, sticker_id)
+                    except Exception as e:
+                        logger.debug(f"Proactive sticker failed for {user_id}: {e}")
 
         # Mark that we've sent a proactive message — reset when user replies
         await create_or_update_user(user_id, {"proactive_sent": True})
