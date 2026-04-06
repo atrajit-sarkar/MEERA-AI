@@ -19,6 +19,7 @@ class SettingsStore(private val context: Context) {
         private val FIREBASE_CREDS_KEY = stringPreferencesKey("firebase_creds")
         private val FIREBASE_DB_ID_KEY = stringPreferencesKey("firebase_db_id")
         private val ENCRYPTION_KEY = stringPreferencesKey("encryption_key")
+        private val BOT_NAME_KEY = stringPreferencesKey("bot_name")
         private val OLLAMA_HOST_KEY = stringPreferencesKey("ollama_host")
         private val OLLAMA_MODEL_KEY = stringPreferencesKey("ollama_model")
         private val ELEVENLABS_VOICE_KEY = stringPreferencesKey("elevenlabs_voice_id")
@@ -28,6 +29,7 @@ class SettingsStore(private val context: Context) {
     val firebaseCreds: Flow<String> = context.dataStore.data.map { it[FIREBASE_CREDS_KEY] ?: "" }
     val firebaseDbId: Flow<String> = context.dataStore.data.map { it[FIREBASE_DB_ID_KEY] ?: "(default)" }
     val encryptionKey: Flow<String> = context.dataStore.data.map { it[ENCRYPTION_KEY] ?: "s7lUp2gY1E6NaSGSEOMvngjSxrUD6_aomM3yqYsdSbo=" }
+    val botName: Flow<String> = context.dataStore.data.map { it[BOT_NAME_KEY] ?: "Meera" }
     val ollamaHost: Flow<String> = context.dataStore.data.map { it[OLLAMA_HOST_KEY] ?: "https://ollama.com" }
     val ollamaModel: Flow<String> = context.dataStore.data.map { it[OLLAMA_MODEL_KEY] ?: "gemini-3-flash-preview:cloud" }
     val elevenlabsVoiceId: Flow<String> = context.dataStore.data.map { it[ELEVENLABS_VOICE_KEY] ?: "21m00Tcm4TlvDq8ikWAM" }
@@ -46,6 +48,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun saveEncryptionKey(key: String) {
         context.dataStore.edit { it[ENCRYPTION_KEY] = key }
+    }
+
+    suspend fun saveBotName(name: String) {
+        context.dataStore.edit { it[BOT_NAME_KEY] = name }
     }
 
     suspend fun saveOllamaHost(host: String) {
@@ -68,6 +74,7 @@ class SettingsStore(private val context: Context) {
                 firebaseCredentialsJson = prefs[FIREBASE_CREDS_KEY] ?: "",
                 firebaseDatabaseId = prefs[FIREBASE_DB_ID_KEY] ?: "(default)",
                 encryptionKey = prefs[ENCRYPTION_KEY] ?: "s7lUp2gY1E6NaSGSEOMvngjSxrUD6_aomM3yqYsdSbo=",
+                botName = prefs[BOT_NAME_KEY] ?: "Meera",
                 ollamaHost = prefs[OLLAMA_HOST_KEY] ?: "https://ollama.com",
                 ollamaModel = prefs[OLLAMA_MODEL_KEY] ?: "gemini-3-flash-preview:cloud",
                 elevenlabsDefaultVoiceId = prefs[ELEVENLABS_VOICE_KEY] ?: "21m00Tcm4TlvDq8ikWAM",

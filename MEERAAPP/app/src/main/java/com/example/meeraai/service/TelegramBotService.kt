@@ -920,7 +920,7 @@ class TelegramBotService(
         val user = users[userId] ?: throw RuntimeException("no_keys")
         if (user.ollamaKeys.isEmpty()) throw RuntimeException("no_keys")
 
-        val messages = OllamaService.buildMessages(userMessage, chatHistory, userProfile)
+        val messages = OllamaService.buildMessages(userMessage, chatHistory, userProfile, config.botName)
         var lastError: Exception? = null
 
         for (encKey in user.ollamaKeys) {

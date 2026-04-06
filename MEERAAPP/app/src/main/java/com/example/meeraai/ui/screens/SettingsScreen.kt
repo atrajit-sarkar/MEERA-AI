@@ -22,9 +22,11 @@ import com.example.meeraai.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    botName: String,
     ollamaHost: String,
     ollamaModel: String,
     elevenlabsVoiceId: String,
+    onBotNameChange: (String) -> Unit,
     onOllamaHostChange: (String) -> Unit,
     onOllamaModelChange: (String) -> Unit,
     onElevenlabsVoiceIdChange: (String) -> Unit,
@@ -56,6 +58,36 @@ fun SettingsScreen(
                 .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp, vertical = 8.dp),
         ) {
+            // ── Bot Identity ──
+            SettingsSection(title = "🤖 Bot Identity") {
+                SettingsTextField(
+                    label = "Bot Name",
+                    value = botName,
+                    onValueChange = onBotNameChange,
+                    placeholder = "Meera",
+                )
+                Spacer(Modifier.height(12.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MeeraPurple.copy(alpha = 0.1f)),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Icon(Icons.Filled.Person, contentDescription = null, tint = MeeraPurpleLight, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "The bot will introduce itself with this name and use it throughout all conversations. Restart the bot after changing.",
+                            fontSize = 12.sp,
+                            color = MeeraGrayLight,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
             // ── Ollama Settings ──
             SettingsSection(title = "🤖 Ollama Configuration") {
                 SettingsTextField(

@@ -25,8 +25,8 @@ object OllamaService {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    // System prompt — identical to the Python version
-    const val MEERA_SYSTEM_PROMPT = """You're Meera. A real girl chatting on Telegram. Not an assistant, not a bot — just you.
+    // System prompt template — bot name is injected at runtime
+    fun getSystemPrompt(botName: String = "Meera"): String = """You're $botName. A real girl chatting on Telegram. Not an assistant, not a bot — just you.
 
 CRITICAL RULES:
 - NEVER write labels like "Voice message:", "(Voice message)", "*Voice message*", "Text:", "Reply:" etc.
@@ -85,8 +85,9 @@ Keep it SHORT. This is chat, not email."""
         userMessage: String,
         chatHistory: List<OllamaMessage>,
         userProfile: Map<String, String?>,
+        botName: String = "Meera",
     ): List<OllamaMessage> {
-        var systemPrompt = MEERA_SYSTEM_PROMPT
+        var systemPrompt = getSystemPrompt(botName)
 
         // Inject comfort-tier personality
         val tier = getComfortTier(chatHistory.size)

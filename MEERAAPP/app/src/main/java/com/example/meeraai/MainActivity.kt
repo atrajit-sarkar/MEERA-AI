@@ -40,6 +40,7 @@ fun MeeraApp(viewModel: BotViewModel = viewModel()) {
 
     val botToken by viewModel.botToken.collectAsState()
     val encryptionKey by viewModel.encryptionKey.collectAsState()
+    val botName by viewModel.botName.collectAsState()
     val ollamaHost by viewModel.ollamaHost.collectAsState()
     val ollamaModel by viewModel.ollamaModel.collectAsState()
     val elevenlabsVoiceId by viewModel.elevenlabsVoiceId.collectAsState()
@@ -79,9 +80,11 @@ fun MeeraApp(viewModel: BotViewModel = viewModel()) {
         }
         composable("settings") {
             SettingsScreen(
+                botName = botName,
                 ollamaHost = ollamaHost,
                 ollamaModel = ollamaModel,
                 elevenlabsVoiceId = elevenlabsVoiceId,
+                onBotNameChange = { viewModel.saveBotName(it) },
                 onOllamaHostChange = { viewModel.saveOllamaHost(it) },
                 onOllamaModelChange = { viewModel.saveOllamaModel(it) },
                 onElevenlabsVoiceIdChange = { viewModel.saveElevenlabsVoiceId(it) },

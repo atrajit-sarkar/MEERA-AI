@@ -34,6 +34,7 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
     // Settings flows
     val botToken = settingsStore.botToken.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val encryptionKey = settingsStore.encryptionKey.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val botName = settingsStore.botName.stateIn(viewModelScope, SharingStarted.Eagerly, "Meera")
     val ollamaHost = settingsStore.ollamaHost.stateIn(viewModelScope, SharingStarted.Eagerly, "https://ollama.com")
     val ollamaModel = settingsStore.ollamaModel.stateIn(viewModelScope, SharingStarted.Eagerly, "gemini-3-flash-preview:cloud")
     val elevenlabsVoiceId = settingsStore.elevenlabsVoiceId.stateIn(viewModelScope, SharingStarted.Eagerly, "21m00Tcm4TlvDq8ikWAM")
@@ -75,6 +76,10 @@ class BotViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveEncryptionKey(key: String) {
         viewModelScope.launch { settingsStore.saveEncryptionKey(key) }
+    }
+
+    fun saveBotName(name: String) {
+        viewModelScope.launch { settingsStore.saveBotName(name) }
     }
 
     fun saveOllamaHost(host: String) {
