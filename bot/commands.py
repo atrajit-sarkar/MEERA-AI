@@ -453,13 +453,15 @@ async def process_clear(message: Message, state: FSMContext, bot: Bot) -> None:
     user_id = message.from_user.id
     deleted = await clear_chat_history(user_id)
 
+    if deleted == 0:
+        await message.answer("Already clean! Nothing to clear 🧹")
+        return
+
     # Visual separator so user knows everything above is forgotten
     await message.answer(
-        "═" * 30 + "\n"
-        "🧹 **Memory cleared**\n"
-        f"_{deleted} messages forgotten_\n"
-        "Everything above this line — I don't remember any of it.\n"
-        "═" * 30 + "\n\n"
-        "Hey! I'm Meera 👋 feels like we're meeting for the first time haha",
-        parse_mode="Markdown",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🧹 Memory cleared — {deleted} messages forgotten\n"
+        "Everything above this line, I don't remember.\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "Hey! I'm Meera 👋 feels like we're meeting for the first time haha"
     )
