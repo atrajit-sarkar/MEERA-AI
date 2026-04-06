@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Firebase credentials
+app/src/main/assets/firebase-credentials.json

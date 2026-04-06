@@ -17,6 +17,9 @@ firebase-base64.txt
 railway-env.txt
 google-stt-credentials.json
 
+# Firebase credentials in Android assets
+MEERAAP/app/src/main/assets/firebase-credentials.json
+
 # Logs
 *.log
 
