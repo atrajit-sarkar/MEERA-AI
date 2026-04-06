@@ -14,6 +14,7 @@ temp/
 # Firebase credentials
 firebase-credentials.json
 firebase-base64.txt
+railway-env.txt
 google-stt-credentials.json
 
 # Logs
