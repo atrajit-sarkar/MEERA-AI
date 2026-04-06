@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+venv/
+.venv/
+
+# Temp files
+temp/
+
+# Firebase credentials
+firebase-credentials.json
+firebase-base64.txt
+google-stt-credentials.json
+
+# Logs
+*.log
+
+# IDE
+.idea/
+.vscode/
