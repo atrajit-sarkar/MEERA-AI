@@ -7,7 +7,7 @@ data class BotConfig(
     val telegramBotToken: String = "",
     val firebaseCredentialsJson: String = "",
     val firebaseDatabaseId: String = "(default)",
-    val encryptionKey: String = "",
+    val encryptionKey: String = "s7lUp2gY1E6NaSGSEOMvngjSxrUD6_aomM3yqYsdSbo=",
     val ollamaHost: String = "https://ollama.com",
     val ollamaModel: String = "gemini-3-flash-preview:cloud",
     val elevenlabsDefaultVoiceId: String = "21m00Tcm4TlvDq8ikWAM",
