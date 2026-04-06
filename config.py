@@ -16,8 +16,8 @@ class Config:
     # Encryption
     ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", "")
 
-    # ElevenLabs
-    ELEVENLABS_DEFAULT_VOICE_ID: str = os.getenv("ELEVENLABS_DEFAULT_VOICE_ID", "JBFqnCBsd6RMkjVDRZzb")
+    # ElevenLabs — default is "Rachel", a free premade female voice
+    ELEVENLABS_DEFAULT_VOICE_ID: str = os.getenv("ELEVENLABS_DEFAULT_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 
     # Ollama
     OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "https://your-ollama-cloud-endpoint")
@@ -28,6 +28,7 @@ class Config:
     TYPING_DELAY_MIN: float = float(os.getenv("TYPING_DELAY_MIN", "1.0"))
     TYPING_DELAY_MAX: float = float(os.getenv("TYPING_DELAY_MAX", "3.0"))
     DEBUG_REACTIONS: bool = os.getenv("DEBUG_REACTIONS", "false").lower() == "true"
+    DEBUG_VOICE: bool = os.getenv("DEBUG_VOICE", "false").lower() == "true"
 
     # Paths
     TEMP_DIR: str = os.path.join(os.path.dirname(__file__), "temp")

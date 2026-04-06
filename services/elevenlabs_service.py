@@ -12,7 +12,7 @@ from services.firebase_service import get_user_api_keys
 logger = logging.getLogger(__name__)
 
 
-async def text_to_speech(user_id: int, text: str) -> str | None:
+async def text_to_speech(user_id: int, text: str, voice_id: str | None = None) -> str | None:
     """Convert text to speech using ElevenLabs. Returns path to mp3 file or None."""
     keys_data = await get_user_api_keys(user_id)
     elevenlabs_keys = keys_data.get("elevenlabs_keys", [])
@@ -28,7 +28,7 @@ async def text_to_speech(user_id: int, text: str) -> str | None:
     for encrypted_key in elevenlabs_keys:
         try:
             decrypted_key = decrypt_key(encrypted_key)
-            audio_path = await _generate_audio(decrypted_key, text, output_path)
+            audio_path = await _generate_audio(decrypted_key, text, output_path, voice_id)
             return audio_path
         except Exception as e:
             last_error = e
@@ -39,8 +39,9 @@ async def text_to_speech(user_id: int, text: str) -> str | None:
     return None
 
 
-async def _generate_audio(api_key: str, text: str, output_path: str) -> str:
+async def _generate_audio(api_key: str, text: str, output_path: str, voice_id: str | None = None) -> str:
     """Generate audio file using ElevenLabs SDK in a thread executor."""
+    resolved_voice_id = voice_id or Config.ELEVENLABS_DEFAULT_VOICE_ID
     loop = asyncio.get_event_loop()
 
     def _sync_generate():
@@ -50,7 +51,7 @@ async def _generate_audio(api_key: str, text: str, output_path: str) -> str:
 
         audio_generator = client.text_to_speech.convert(
             text=text,
-            voice_id=Config.ELEVENLABS_DEFAULT_VOICE_ID,
+            voice_id=resolved_voice_id,
             model_id="eleven_multilingual_v2",
             output_format="mp3_44100_128",
         )

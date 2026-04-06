@@ -141,6 +141,21 @@ async def save_message(user_id: int, role: str, content: str) -> None:
     )
 
 
+async def clear_chat_history(user_id: int) -> int:
+    """Delete all chat history for a user. Returns number of messages deleted."""
+    db = get_db()
+    messages_ref = (
+        db.collection("chats")
+        .document(str(user_id))
+        .collection("messages")
+    )
+    count = 0
+    async for doc in messages_ref.stream():
+        await doc.reference.delete()
+        count += 1
+    return count
+
+
 # ─── Error Messages ───────────────────────────────────────────────
 
 async def get_error_messages(category: str) -> list[str]:
@@ -208,12 +223,13 @@ async def update_user_profile(user_id: int, name: str | None = None, bio: str | 
 async def get_user_profile(user_id: int) -> dict:
     user = await get_user(user_id)
     if not user:
-        return {"profile_name": None, "profile_bio": None, "tone": "casual", "reply_length": "medium"}
+        return {"profile_name": None, "profile_bio": None, "tone": "casual", "reply_length": "medium", "voice_id": None}
     return {
         "profile_name": user.get("profile_name"),
         "profile_bio": user.get("profile_bio"),
         "tone": user.get("tone", "casual"),
         "reply_length": user.get("reply_length", "medium"),
+        "voice_id": user.get("voice_id"),
     }
 
 

@@ -103,13 +103,17 @@ def _clean_text_for_tts(text: str) -> str:
     return text
 
 
-async def _send_voice_reply(bot: Bot, message: Message, user_id: int, ai_text: str) -> bool:
+async def _send_voice_reply(bot: Bot, message: Message, user_id: int, ai_text: str, voice_id: str | None = None) -> bool:
     """Try to send a voice reply. Returns True if successful."""
     try:
         await bot.send_chat_action(message.chat.id, "record_voice")
         clean_text = _clean_text_for_tts(ai_text)
-        audio_path = await text_to_speech(user_id, clean_text)
+        logger.info(f"[Voice] Generating TTS for user {user_id}, voice_id={voice_id or 'default'}, text_len={len(clean_text)}")
+        audio_path = await text_to_speech(user_id, clean_text, voice_id)
+        logger.info(f"[Voice] TTS result: audio_path={audio_path}")
         if audio_path and os.path.exists(audio_path):
+            file_size = os.path.getsize(audio_path)
+            logger.info(f"[Voice] Audio file size: {file_size} bytes")
             voice_file = FSInputFile(audio_path)
             # Reply to the original message ~50% of the time (human-like)
             if random.random() < 0.5:
@@ -157,7 +161,7 @@ async def handle_text_message(message: Message, bot: Bot) -> None:
         # Decide voice or text BEFORE generating response (so we show the right indicator)
         user_data = await get_user(user_id)
         voice_only = user_data.get("voice_only", False) if user_data else False
-        use_voice = voice_only or await should_reply_with_voice(
+        use_voice = Config.DEBUG_VOICE or voice_only or await should_reply_with_voice(
             user_id, user_text, "text", chat_history
         )
 
@@ -172,7 +176,7 @@ async def handle_text_message(message: Message, bot: Bot) -> None:
             # Switch to record_voice indicator + natural delay
             await bot.send_chat_action(message.chat.id, "record_voice")
             await asyncio.sleep(random.uniform(1.0, 2.0))
-            sent = await _send_voice_reply(bot, message, user_id, ai_response)
+            sent = await _send_voice_reply(bot, message, user_id, ai_response, user_profile.get("voice_id"))
             if not sent:
                 # Fallback to text if voice fails
                 await _simulate_typing(bot, message.chat.id, len(ai_response))
@@ -255,7 +259,7 @@ async def handle_voice_message(message: Message, bot: Bot) -> None:
             await bot.send_chat_action(message.chat.id, "record_voice")
             await asyncio.sleep(random.uniform(1.0, 2.5))
 
-            sent = await _send_voice_reply(bot, message, user_id, ai_response)
+            sent = await _send_voice_reply(bot, message, user_id, ai_response, user_profile.get("voice_id"))
             if not sent:
                 # Voice failed — fallback to text with typing indicator
                 await _simulate_typing(bot, message.chat.id, len(ai_response))

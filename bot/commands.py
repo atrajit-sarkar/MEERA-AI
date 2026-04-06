@@ -2,7 +2,7 @@
 
 import logging
 
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
@@ -13,6 +13,7 @@ from services.firebase_service import (
     get_user_profile,
     update_user_profile,
     update_tone_profile,
+    clear_chat_history,
 )
 from services.key_manager import (
     add_user_ollama_key,
@@ -38,6 +39,14 @@ class KeyStates(StatesGroup):
     waiting_for_remove_key = State()
 
 
+class VoiceStates(StatesGroup):
+    waiting_for_voice_id = State()
+
+
+class ClearStates(StatesGroup):
+    waiting_for_confirm = State()
+
+
 # ─── /start ────────────────────────────────────────────────────────
 
 @router.message(CommandStart())
@@ -59,7 +68,9 @@ async def cmd_start(message: Message) -> None:
         f"📋 /list_keys — View your saved keys\n"
         f"🗑 /remove_key — Remove a key\n"
         f"🎭 /tone — Set conversation tone\n"
+        f"🎤 /setvoice — Set custom voice\n"
         f"🗣 /talk — Toggle voice-only replies\n"
+        f"🧹 /clear — Wipe chat history & start fresh\n"
         f"❓ /help — See all commands\n\n"
         f"Each user uses their own API keys — your usage is private! 🔒"
     )
@@ -81,7 +92,9 @@ async def cmd_help(message: Message) -> None:
         "**Personalization:**\n"
         "👤 /profile — Set your name & bio\n"
         "🎭 /tone — Set formal/casual + short/long\n"
-        "🗣 /talk — Toggle voice-only mode\n\n"
+        "🎤 /setvoice — Use your own ElevenLabs voice\n"
+        "🗣 /talk — Toggle voice-only mode\n"
+        "🧹 /clear — Wipe chat history & start fresh\n\n"
         "**Note:** You need your own API keys. "
         "Get Ollama key from your provider and ElevenLabs from elevenlabs.io",
         parse_mode="Markdown",
@@ -99,16 +112,19 @@ async def cmd_profile(message: Message) -> None:
     bio = profile.get("profile_bio") or "Not set"
     tone = profile.get("tone", "casual")
     reply_len = profile.get("reply_length", "medium")
+    voice = profile.get("voice_id") or "Default (Rachel)"
 
     await message.answer(
         f"👤 **Your Profile**\n\n"
         f"**Name:** {name}\n"
         f"**Bio:** {bio}\n"
         f"**Tone:** {tone}\n"
-        f"**Reply length:** {reply_len}\n\n"
+        f"**Reply length:** {reply_len}\n"
+        f"**Voice:** {voice}\n\n"
         f"To update:\n"
         f"/setname — Change your name\n"
-        f"/setbio — Change your bio",
+        f"/setbio — Change your bio\n"
+        f"/setvoice — Change your voice",
         parse_mode="Markdown",
     )
 
@@ -334,3 +350,79 @@ async def process_remove_key(message: Message, state: FSMContext) -> None:
         await message.answer("✅ Key removed!")
     else:
         await message.answer("❌ Couldn't find that key. Check /list_keys for valid indices.")
+
+
+# ─── /setvoice — Set custom ElevenLabs voice ID ───────────────────
+
+@router.message(Command("setvoice"))
+async def cmd_setvoice(message: Message, state: FSMContext) -> None:
+    profile = await get_user_profile(message.from_user.id)
+    current = profile.get("voice_id") or "Default (Rachel)"
+
+    await state.set_state(VoiceStates.waiting_for_voice_id)
+    await message.answer(
+        f"🎙 **Current voice:** {current}\n\n"
+        f"Send me your ElevenLabs Voice ID to use a custom voice.\n"
+        f"You can create one at elevenlabs.io → Voices → Add Voice\n\n"
+        f"Send `reset` to go back to the default voice.",
+        parse_mode="Markdown",
+    )
+
+
+@router.message(VoiceStates.waiting_for_voice_id, F.text)
+async def process_setvoice(message: Message, state: FSMContext) -> None:
+    text = message.text.strip()
+    await state.clear()
+
+    if text.lower() == "reset":
+        await create_or_update_user(message.from_user.id, {"voice_id": None})
+        await message.answer("🎙 Voice reset to default (Rachel)! 🔄")
+        return
+
+    # Basic validation — ElevenLabs voice IDs are ~20 alphanumeric chars
+    if len(text) < 10 or len(text) > 40 or not text.isalnum():
+        await message.answer("That doesn't look like a valid voice ID. It should be a 20-character alphanumeric string from ElevenLabs.")
+        return
+
+    await create_or_update_user(message.from_user.id, {"voice_id": text})
+    await message.answer(f"✅ Voice updated! I'll use voice `{text}` from now on 🎤", parse_mode="Markdown")
+
+
+# ─── /clear — Wipe chat history and start fresh ───────────────────
+
+@router.message(Command("clear"))
+async def cmd_clear(message: Message, state: FSMContext) -> None:
+    await state.set_state(ClearStates.waiting_for_confirm)
+    await message.answer(
+        "🧹 **Are you sure you want to clear our entire chat history?**\n\n"
+        "This will:\n"
+        "• Delete all messages from memory\n"
+        "• Reset our relationship back to strangers\n"
+        "• Meera won't remember anything from before\n\n"
+        "Type `yes` to confirm or `no` to cancel.",
+        parse_mode="Markdown",
+    )
+
+
+@router.message(ClearStates.waiting_for_confirm, F.text)
+async def process_clear(message: Message, state: FSMContext, bot: Bot) -> None:
+    text = message.text.strip().lower()
+    await state.clear()
+
+    if text not in ("yes", "y"):
+        await message.answer("Phew! History kept safe 😌")
+        return
+
+    user_id = message.from_user.id
+    deleted = await clear_chat_history(user_id)
+
+    # Visual separator so user knows everything above is forgotten
+    await message.answer(
+        "═" * 30 + "\n"
+        "🧹 **Memory cleared**\n"
+        f"_{deleted} messages forgotten_\n"
+        "Everything above this line — I don't remember any of it.\n"
+        "═" * 30 + "\n\n"
+        "Hey! I'm Meera 👋 feels like we're meeting for the first time haha",
+        parse_mode="Markdown",
+    )
