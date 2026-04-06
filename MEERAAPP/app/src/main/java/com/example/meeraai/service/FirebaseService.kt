@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit
 class FirebaseService(private val context: Context) {
 
     private val client = OkHttpClient.Builder()
+        .dns(ReliableDns)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)

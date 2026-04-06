@@ -28,6 +28,7 @@ class TelegramBotService(
     private val firebase: FirebaseService,
 ) {
     private val client = OkHttpClient.Builder()
+        .dns(ReliableDns)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS) // Long polling needs long timeout
         .writeTimeout(30, TimeUnit.SECONDS)

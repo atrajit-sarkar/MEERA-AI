@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit
 object ElevenLabsService {
 
     private val client = OkHttpClient.Builder()
+        .dns(ReliableDns)
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -149,7 +150,7 @@ object ElevenLabsService {
         cleaned = cleaned.replace(Regex("[`~]"), "")
 
         // Remove leading/trailing quotes
-        cleaned = cleaned.trim().replace(Regex("^[\"''""]+|[\"''""]+$"), "")
+        cleaned = cleaned.trim().replace(Regex("""^["'“”]+|["'“”]+$"""), "")
 
         // Collapse whitespace
         cleaned = cleaned.replace(Regex("\\s+"), " ").trim()

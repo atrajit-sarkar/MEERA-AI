@@ -28,7 +28,7 @@ class SettingsStore(private val context: Context) {
     val firebaseCreds: Flow<String> = context.dataStore.data.map { it[FIREBASE_CREDS_KEY] ?: "" }
     val firebaseDbId: Flow<String> = context.dataStore.data.map { it[FIREBASE_DB_ID_KEY] ?: "(default)" }
     val encryptionKey: Flow<String> = context.dataStore.data.map { it[ENCRYPTION_KEY] ?: "" }
-    val ollamaHost: Flow<String> = context.dataStore.data.map { it[OLLAMA_HOST_KEY] ?: "https://your-ollama-cloud-endpoint" }
+    val ollamaHost: Flow<String> = context.dataStore.data.map { it[OLLAMA_HOST_KEY] ?: "https://ollama.com" }
     val ollamaModel: Flow<String> = context.dataStore.data.map { it[OLLAMA_MODEL_KEY] ?: "gemini-3-flash-preview:cloud" }
     val elevenlabsVoiceId: Flow<String> = context.dataStore.data.map { it[ELEVENLABS_VOICE_KEY] ?: "21m00Tcm4TlvDq8ikWAM" }
 
@@ -68,7 +68,7 @@ class SettingsStore(private val context: Context) {
                 firebaseCredentialsJson = prefs[FIREBASE_CREDS_KEY] ?: "",
                 firebaseDatabaseId = prefs[FIREBASE_DB_ID_KEY] ?: "(default)",
                 encryptionKey = prefs[ENCRYPTION_KEY] ?: "",
-                ollamaHost = prefs[OLLAMA_HOST_KEY] ?: "https://your-ollama-cloud-endpoint",
+                ollamaHost = prefs[OLLAMA_HOST_KEY] ?: "https://ollama.com",
                 ollamaModel = prefs[OLLAMA_MODEL_KEY] ?: "gemini-3-flash-preview:cloud",
                 elevenlabsDefaultVoiceId = prefs[ELEVENLABS_VOICE_KEY] ?: "21m00Tcm4TlvDq8ikWAM",
             )
