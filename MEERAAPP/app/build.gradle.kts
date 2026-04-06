@@ -12,6 +12,15 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../meera-release.jks")
+            storePassword = "meera2026"
+            keyAlias = "meera"
+            keyPassword = "meera2026"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.example.meeraai"
         minSdk = 26
@@ -24,11 +33,13 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

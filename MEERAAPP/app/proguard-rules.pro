@@ -5,17 +5,35 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# ── kotlinx-serialization ──
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
+-keep,includedescriptorclasses class com.example.meeraai.data.**$$serializer { *; }
+-keepclassmembers class com.example.meeraai.data.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.example.meeraai.data.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# ── OkHttp ──
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+
+# ── App service classes (reflection-safe) ──
+-keep class com.example.meeraai.service.** { *; }
+
+# ── Keep line numbers for crash reports ──
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 #-renamesourcefileattribute SourceFile

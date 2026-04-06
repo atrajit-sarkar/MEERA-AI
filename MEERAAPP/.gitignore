@@ -16,3 +16,6 @@ local.properties
 
 # Firebase credentials
 app/src/main/assets/firebase-credentials.json
+
+# Release keystore
+meera-release.jks
