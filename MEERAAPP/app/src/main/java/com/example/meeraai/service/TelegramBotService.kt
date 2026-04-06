@@ -67,7 +67,7 @@ class TelegramBotService(
 
         // Initialize Firebase
         try {
-            firebase.init()
+            firebase.init(dbId = "pussy")
             log("INFO", "Firebase", "Firestore connected (project: meeraai-482bb)")
             // Seed default error messages if needed
             firebase.seedErrorMessages()
