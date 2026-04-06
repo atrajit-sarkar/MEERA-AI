@@ -59,20 +59,55 @@ async def cmd_start(message: Message) -> None:
         "first_name": message.from_user.first_name,
     })
 
+    # Welcome message
     await message.answer(
         f"Hey {username}! 💫 I'm Meera — your AI bestie on Telegram!\n\n"
-        f"Before we can chat, you'll need to add your API keys:\n\n"
-        f"🔑 /add_ollama_key — Add your Ollama/Gemini API key\n"
-        f"🎙 /add_elevenlabs_key — Add ElevenLabs key (for voice)\n"
-        f"👤 /profile — Set your name & bio\n"
-        f"📋 /list_keys — View your saved keys\n"
-        f"🗑 /remove_key — Remove a key\n"
-        f"🎭 /tone — Set conversation tone\n"
-        f"🎤 /setvoice — Set custom voice\n"
-        f"🗣 /talk — Toggle voice-only replies\n"
-        f"🧹 /clear — Wipe chat history & start fresh\n"
-        f"❓ /help — See all commands\n\n"
-        f"Each user uses their own API keys — your usage is private! 🔒"
+        f"Let me help you get set up real quick 👇",
+    )
+
+    # Step 1: Ollama key guide
+    await message.answer(
+        "🔑 **Step 1: Get your AI key (required)**\n\n"
+        "I use Ollama to think & chat. Here's how to get a key:\n\n"
+        "1️⃣ Go to ollama.com and sign in\n"
+        "2️⃣ Click on your profile → **Settings** → **API Keys**\n"
+        "3️⃣ Click **Create new key** and copy it\n"
+        "4️⃣ Come back here and use /add\\_ollama\\_key\n"
+        "5️⃣ Paste your key — I'll encrypt & store it securely\n\n"
+        "⚡ You can add multiple keys for automatic rotation!",
+        parse_mode="Markdown",
+    )
+
+    # Step 2: ElevenLabs key guide
+    await message.answer(
+        "🎙 **Step 2: Get your voice key (optional but fun!)**\n\n"
+        "I use ElevenLabs for both voice replies AND listening to your voice messages.\n"
+        "One key powers everything — text-to-speech + speech-to-text!\n\n"
+        "1️⃣ Go to elevenlabs.io and create a free account\n"
+        "2️⃣ Click your profile icon → **API Keys**\n"
+        "3️⃣ Copy your API key\n"
+        "4️⃣ Come back here and use /add\\_elevenlabs\\_key\n"
+        "5️⃣ Paste your key — done!\n\n"
+        "💡 **Bonus:** Want a custom voice? Go to elevenlabs.io → Voices → "
+        "Create a voice → Copy the Voice ID → Use /setvoice here\n\n"
+        "⚡ Multiple keys supported — auto-rotates if one hits rate limits!",
+        parse_mode="Markdown",
+    )
+
+    # Step 3: Quick reference
+    await message.answer(
+        "✅ **That's it! Once keys are added, just text me and we're vibing.**\n\n"
+        "📋 **Quick commands:**\n"
+        "/add\\_ollama\\_key — Add AI key\n"
+        "/add\\_elevenlabs\\_key — Add voice key\n"
+        "/profile — Set your name & bio\n"
+        "/setvoice — Use custom voice\n"
+        "/tone — Set chat style\n"
+        "/talk — Voice-only mode\n"
+        "/clear — Wipe memory & start fresh\n"
+        "/help — All commands\n\n"
+        "🔒 Each user uses their own API keys — your data stays yours!",
+        parse_mode="Markdown",
     )
 
 
@@ -83,20 +118,22 @@ async def cmd_help(message: Message) -> None:
     await message.answer(
         "✨ **Meera Commands** ✨\n\n"
         "💬 Just send me a message to chat!\n"
-        "🎤 Send a voice message — I'll listen and can reply with voice too!\n\n"
-        "**Setup:**\n"
-        "🔑 /add\\_ollama\\_key — Add Ollama API key\n"
-        "🎙 /add\\_elevenlabs\\_key — Add ElevenLabs API key\n"
-        "📋 /list\\_keys — View your keys\n"
+        "🎤 Send a voice message — I'll listen & can reply with voice too!\n\n"
+        "**🔧 Setup:**\n"
+        "🔑 /add\\_ollama\\_key — Add Ollama API key (ollama.com → Settings → API Keys)\n"
+        "🎙 /add\\_elevenlabs\\_key — Add ElevenLabs key (elevenlabs.io → API Keys)\n"
+        "📋 /list\\_keys — View your saved keys\n"
         "🗑 /remove\\_key — Remove a key\n\n"
-        "**Personalization:**\n"
+        "**🎨 Personalization:**\n"
         "👤 /profile — Set your name & bio\n"
         "🎭 /tone — Set formal/casual + short/long\n"
         "🎤 /setvoice — Use your own ElevenLabs voice\n"
         "🗣 /talk — Toggle voice-only mode\n"
         "🧹 /clear — Wipe chat history & start fresh\n\n"
-        "**Note:** You need your own API keys. "
-        "Get Ollama key from your provider and ElevenLabs from elevenlabs.io",
+        "**💡 Tips:**\n"
+        "• One ElevenLabs key handles both voice replies AND voice listening\n"
+        "• Add multiple keys for automatic rotation if one hits rate limits\n"
+        "• Use /start to see the full setup guide again",
         parse_mode="Markdown",
     )
 
